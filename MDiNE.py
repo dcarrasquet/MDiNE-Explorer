@@ -9,6 +9,8 @@ import csv
 import pymc.math
 from functools import partial
 
+#pytensor.exception_verbosity = 'high'
+
 print(f"Running on PyMC v{pm.__version__}")
 
 # fmt: off
@@ -70,7 +72,39 @@ def get_data(file_name):
 
     return(covariate_matrix,counts_matrix,Z_vector)
 
+def precision_matrix(lambda_mdine,matrix_size):
+        ''' Create precision matrix through exponential and Laplace distribution '''
+        precision_matrix=pytensor.tensor.matrix(name="precision_matrix",shape=(matrix_size,matrix_size))
+        for i in range(matrix_size):
+            for j in range(i+1):
+                if i == j:
+                    precision_matrix.set((i,j),pm.Exponential(f'diag_{i}_{j}', lam=lambda_mdine/2))
+                    #precision_matrix[i, j] = pm.Exponential(f'diag_{i}_{j}', lam=lambda_mdine/2)
+                else:
+                    distrib= pm.Laplace(f'off_diag_{i}_{j}', mu=0, b=lambda_mdine)
+                    #precision_matrix[i, j] = distrib
+                    #precision_matrix[j, i] = distrib
+                    precision_matrix.set((i,j),distrib)
+                    precision_matrix.set((j,i),distrib)
+
+        liste_nimportequoi=precision_matrix[0,:]
+
+        print("TETSSTTSTS: ",liste_nimportequoi.shape)
+
+        return precision_matrix
+
+def precision_matrix_2(lambda_mdine,matrix_size):
+    off_diag_elements = pm.Laplace('off_diag_dist', mu=0, b=lambda_mdine, shape=matrix_size*(matrix_size-1)//2)
+    diag_elements = pm.Exponential('diag_dist', lam=lambda_mdine/2, shape=matrix_size)
+    triang_matrix=pymc.math.expand_packed_triangular(off_diag_elements) # Probleme avec la diagonale
+    diag_matrix=pymc.math.block_diagonal(diag_elements)
+    #off_diag_dist = pm.Laplace('off_diag_dist', mu=0, b=lambda_mdine, shape=matrix_size*(matrix_size-1)//2)
+    #matrix_values = pm.math.fill_diagonal(pymc.math.zeros((matrix_size, matrix_size)), diag_dist)
+    #matrix_values = pm.math.fill_triangular(matrix_values, off_diag_dist)
+    return pymc.Deterministic('precision_matrix', matrix_values + matrix_values.T - pymc.math.diag(pymc.math.diag(matrix_values)))
+
 (covariate_matrix_data,counts_matrix_data,Z_vector_data)=get_data("crohns.csv")
+
 
 with pm.Model() as mdine_model:
     # Comment gérer les matrices et les vecteurs?
@@ -84,8 +118,9 @@ with pm.Model() as mdine_model:
     if covariate_matrix_data.shape[0]!=n_individus:
         print("Error dimensions between covariates matrix and counts matrix don't correspond ")
     
-    #rng = np.random.default_rng(seed=sum(map(ord, "dimensionality")))
-    #draw = partial(pm.draw, random_seed=rng)
+    
+
+    #### Matrice paramètres Beta ###########
     
     sigma=100
     beta_matrix=pm.Normal("beta_matrix",mu=0,sigma=sigma,shape=(k_covariates,j_taxa_plus_ref-1))
@@ -96,7 +131,7 @@ with pm.Model() as mdine_model:
     j_taxa=j_taxa_plus_ref-1
 
     #precision_matrix= np.empty((j_taxa_plus_ref-1, j_taxa_plus_ref-1), dtype=object)
-    precision_matrix=pytensor.tensor.matrix(name="precision_matrix",shape=(j_taxa,j_taxa))
+    #precision_matrix=pytensor.tensor.matrix(name="precision_matrix",shape=(j_taxa,j_taxa))
     #precision_matrix=pytensor.tensor.matrix(name="precision_matrix",shape=(j_taxa_plus_ref-1, j_taxa_plus_ref-1))
     #j_taxa=precision_matrix.shape[0]
 
@@ -104,19 +139,25 @@ with pm.Model() as mdine_model:
 
     choix_precision_matrix="coef_by_coef"
 
-    for i in range(j_taxa):
-        for j in range(i+1):
-            print("Couple i j ",i," ",j)
-            if i == j:
-                precision_matrix.set((i,j),pm.Exponential(f'diag_{i}_{j}', lam=lambda_mdine/2))
-                #precision_matrix[i, j] = pm.Exponential(f'diag_{i}_{j}', lam=lambda_mdine/2)
-            else:
-                distrib= pm.Laplace(f'off_diag_{i}_{j}', mu=0, b=lambda_mdine)
-                #precision_matrix[i, j] = distrib
-                #precision_matrix[j, i] = distrib
-                precision_matrix.set((i,j),distrib)
-                precision_matrix.set((j,i),distrib)
+    # for i in range(j_taxa):
+    #     for j in range(i+1):
+    #         #print("Couple i j ",i," ",j)
+    #         if i == j:
+    #             precision_matrix.set((i,j),pm.Exponential(f'diag_{i}_{j}', lam=lambda_mdine/2))
+    #             #precision_matrix[i, j] = pm.Exponential(f'diag_{i}_{j}', lam=lambda_mdine/2)
+    #         else:
+    #             distrib= pm.Laplace(f'off_diag_{i}_{j}', mu=0, b=lambda_mdine)
+    #             #precision_matrix[i, j] = distrib
+    #             #precision_matrix[j, i] = distrib
+    #             precision_matrix.set((i,j),distrib)
+    #             precision_matrix.set((j,i),distrib)
 
+    #precision_matrix=pm.Deterministic("precision_matrix",precision_matrix(lambda_mdine=lambda_mdine,matrix_size=j_taxa))
+
+    
+
+    # print(precision_matrix)
+    # print(type(precision_matrix))
     # print(precision_matrix)
     # print(type(precision_matrix))
 
@@ -140,17 +181,22 @@ with pm.Model() as mdine_model:
 
     print("Type xbeta 0 0: ", type(product_X_Beta[0,0]))
 
-    print("Type precision matrix: ", type(precision_matrix))
+    #print("Type precision matrix: ", type(precision_matrix))
     print("Type productbeta: ", type(product_X_Beta))
 
     matrix_w=pytensor.tensor.matrix(name="matrix_w",shape=(n_individus,j_taxa))
     #matrix_w=np.empty((n_individus,j_taxa),dtype=object)
 
+    precision_matrix=precision_matrix(lambda_mdine=lambda_mdine,matrix_size=j_taxa)
+
     for i in range (n_individus):
         string=f"W_row_{i}"
+
         #print("Taille W_i: ",matrix_w[i].shape[0])
         #matrix_w[i]=pm.MvNormal(string,mu=product_X_Beta[i,:],tau=precision_matrix,shape=(1,j_taxa))
+        #distrib=pm.MvNormal(string,mu=product_X_Beta[i,:],tau=precision_matrix,shape=(1,j_taxa))
         distrib=pm.MvNormal(string,mu=product_X_Beta[i,:],tau=precision_matrix,shape=(1,j_taxa))
+        
         pytensor.tensor.subtensor.set_subtensor(matrix_w[i:], distrib)
         #matrix_w.set((i,j))
 
@@ -164,20 +210,30 @@ with pm.Model() as mdine_model:
                 else:
                     #proportions_matrix[i,j]=pm.Deterministic(f"String{i}{j}",matrix_w[i,j]/(1+sum(matrix_w[i])))
                     proportions_matrix.set((i,j),pm.Deterministic(f"String_derniere_colonne{i}{j}",matrix_w[i,j]/(1+sum(matrix_w[i]))))
-                    print(matrix_w[i,j])
 
     #counts_matrix=np.empty((n_individus,j_taxa_plus_ref),dtype=object)
     counts_matrix=pytensor.tensor.matrix(name="counts_matrix",shape=(n_individus,j_taxa_plus_ref))
     for i in range (n_individus):
+        #print(counts_matrix_data[i,:])
+        #print("Counts matrix data shape: ",counts_matrix_data[i,:].shape[0],counts_matrix_data[i,:].shape[1])
+        #print("Counts matrix shape: ",counts_matrix[i,:].shape[0],counts_matrix[i,:].shape[1])
+        #print("Size",dir(counts_matrix))
         #counts_matrix[i]=pm.Multinomial("counts_matrix",n=counts_matrix_data[i],p=proportions_matrix[i],observed=counts_matrix_data[i])
-        pytensor.tensor.subtensor.set_subtensor(counts_matrix[i:], pm.Multinomial(f"counts_matrix_ligne{i}",n=counts_matrix_data[i],p=proportions_matrix[i],observed=counts_matrix_data[i,:]))
-
+        pytensor.tensor.subtensor.set_subtensor(counts_matrix[i,:], pm.Multinomial(f"counts_matrix_ligne{i}",n=sum(counts_matrix_data[i]),p=proportions_matrix[i],observed=counts_matrix_data[i,:]))
+        
+        #pytensor.tensor.subtensor.set_subtensor(counts_matrix[i:], pm.Multinomial(f"counts_matrix_ligne{i}",n=counts_matrix_data[i],p=proportions_matrix[i]))
 
 with mdine_model:
-    idata = pm.sample(10000)
+    idata = pm.sample(5) ## 10000 normalement
 
-graph=pm.model_to_graphviz(mdine_model)
-graph.render('mdine_graph.gv')
+print("Est ce que j'arrive ici?")
+
+#graph=pm.model_to_graphviz(mdine_model)
+#graph.render('mdine_graph.gv')
+
+
+
+
 
 # /Users/damien/Documents/scolarité/Centrale\ Lyon/TFE/travail/
 # export PATH="/opt/homebrew/bin:$PATH"
