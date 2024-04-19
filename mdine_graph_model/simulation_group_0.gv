@@ -1,0 +1,63 @@
+digraph {
+	subgraph "cluster4 x 5" {
+		beta_matrix [label="beta_matrix
+~
+Normal" shape=ellipse]
+		label="4 x 5" labeljust=r labelloc=b style=rounded
+	}
+	lambda_mdine [label="lambda_mdine
+~
+Exponential" shape=ellipse]
+	subgraph cluster5 {
+		precision_matrix_coef_diag [label="precision_matrix_coef_diag
+~
+Exponential" shape=ellipse]
+		label=5 labeljust=r labelloc=b style=rounded
+	}
+	subgraph cluster10 {
+		precision_matrix_coef_off_diag [label="precision_matrix_coef_off_diag
+~
+Laplace" shape=ellipse]
+		label=10 labeljust=r labelloc=b style=rounded
+	}
+	subgraph "cluster5 x 5" {
+		precision_matrix [label="precision_matrix
+~
+Deterministic" shape=box]
+		label="5 x 5" labeljust=r labelloc=b style=rounded
+	}
+	subgraph "cluster36 x 4" {
+		X_covariates [label="X_covariates
+~
+Deterministic" shape=box]
+		label="36 x 4" labeljust=r labelloc=b style=rounded
+	}
+	subgraph "cluster36 x 5" {
+		Product_X_Beta [label="Product_X_Beta
+~
+Deterministic" shape=box]
+		w_matrix [label="w_matrix
+~
+MvNormal" shape=ellipse]
+		label="36 x 5" labeljust=r labelloc=b style=rounded
+	}
+	subgraph "cluster36 x 6" {
+		proportions_matrix [label="proportions_matrix
+~
+Deterministic" shape=box]
+		counts_matrix [label="counts_matrix
+~
+Multinomial" shape=ellipse style=filled]
+		label="36 x 6" labeljust=r labelloc=b style=rounded
+	}
+	lambda_mdine -> precision_matrix_coef_diag
+	lambda_mdine -> precision_matrix_coef_off_diag
+	precision_matrix_coef_diag -> precision_matrix
+	precision_matrix_coef_off_diag -> precision_matrix
+	X_covariates -> Product_X_Beta
+	beta_matrix -> Product_X_Beta
+	Product_X_Beta -> w_matrix
+	precision_matrix -> w_matrix
+	w_matrix -> proportions_matrix
+	proportions_matrix -> counts_matrix
+}

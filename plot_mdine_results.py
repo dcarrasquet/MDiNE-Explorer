@@ -5,8 +5,7 @@ import numpy as np
 import math
 import networkx as nx
 
-from extract_data_files import get_species_list
-
+from extract_data_files import get_species_list, separate_data_in_two_groups, get_data
 
 def get_forest(idata):
     az.plot_forest(idata, var_names=["precision_matrix"], combined=True, hdi_prob=0.80) # az.plot_forest(idata, var_names=["beta"], combined=True, hdi_prob=0.95, r_hat=True);
@@ -14,9 +13,13 @@ def get_forest(idata):
     plt.show()
 
 
-def get_co_occurence_network(idata,counts_matrix,species_list,density_pourcentage=0.80,edge_width=5):
+def get_co_occurence_network(idata,counts_matrix,species_list,density_pourcentage=0.80,edge_width=5,node_width=1):
 
     precision_matrix=idata.posterior.precision_matrix.values[3][-1]
+
+    print("AAAAA: ",type(counts_matrix))
+
+    counts_mean=np.mean(counts_matrix,axis=0)[:-1] #Remove the last reference column
 
     # Correlation Matrix
     correlation_matrix=np.zeros((5,5))
@@ -53,10 +56,14 @@ def get_co_occurence_network(idata,counts_matrix,species_list,density_pourcentag
     edge_colors = nx.get_edge_attributes(G, 'color').values()
     edge_widths = nx.get_edge_attributes(G, 'weight').values()
 
+    # To specfy the postions of the nodes:
+    #positions_noeuds = {"Node1": (0, 0), "Node2": (1, 1), "Node3": (2, 0)}
+    # Add argument pos=positions_noeuds in nx.draw
+
     # Dessiner le graphe
     pos = nx.spring_layout(G)  # Définir la disposition des nœuds
     #nx.draw(G, pos, with_labels=True, edge_color=edge_colors, width=list(edge_widths), arrowsize=10)
-    graph_plot=nx.draw(G, pos, with_labels=True, edge_color=edge_colors, width=list(edge_widths))
+    graph_plot=nx.draw(G, pos, with_labels=True,node_color="yellow",node_size=counts_mean*node_width, edge_color=edge_colors, width=list(edge_widths))
     plt.show()
     plt.plot()
 
@@ -64,7 +71,9 @@ def get_co_occurence_network(idata,counts_matrix,species_list,density_pourcentag
 
 if __name__=="__main__":
 
-    filename="results_simulations/simulation1.pkl"
+    simulation_name="simulation_group_1"
+
+    filename=f"results_simulations/{simulation_name}.pkl"
     
     # Charger la variable à partir du fichier
     with open(filename, "rb") as f:
@@ -72,4 +81,10 @@ if __name__=="__main__":
 
     species_list=get_species_list("data/crohns.csv")
 
-    graph=get_co_occurence_network(idata,[],species_list,density_pourcentage=0.3,edge_width=10)
+    (covariate_matrix_data,counts_matrix_data,Z_vector)=get_data("data/crohns.csv")
+    first_group,second_group=separate_data_in_two_groups(covariate_matrix_data,counts_matrix_data,Z_vector)
+
+    #counts_matrix=first_group[1]
+    counts_matrix=second_group[1]
+
+    graph=get_co_occurence_network(idata,counts_matrix,species_list,density_pourcentage=0.4,edge_width=10,node_width=0.3)

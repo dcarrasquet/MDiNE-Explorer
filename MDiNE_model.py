@@ -8,6 +8,7 @@ import pymc.math
 import pickle
 
 from extract_data_files import get_data
+from extract_data_files import separate_data_in_two_groups
 
 print(f"Running on PyMC v{pm.__version__}")
 
@@ -19,14 +20,9 @@ def make_precision_matrix(coef_diag,coef_off_diag,j_taxa):
 
     return triang_strict+pytensor.tensor.transpose(triang_strict)+pytensor.tensor.diag(coef_diag)
 
-def run_model():
+def run_model(covariate_matrix_data,counts_matrix_data,simulation_name):
 
     with pm.Model() as mdine_model:
-
-        #### Data recovery
-
-        filename="data/crohns.csv"
-        (covariate_matrix_data,counts_matrix_data,Z_vector)=get_data(filename)
 
         j_taxa_plus_ref = counts_matrix_data.shape[1]
         n_individuals = counts_matrix_data.shape[0]
@@ -77,12 +73,13 @@ def run_model():
 
 
     graph=pm.model_to_graphviz(mdine_model)
-    graph.render('mdine_graph_model/simulation1.gv')
+
+    graph.render(f'mdine_graph_model/{simulation_name}.gv')
 
     with mdine_model:
         idata = pm.sample(1000) ## 10000 normally
 
-    with open("results_simulations/simulation1.pkl", "wb") as f: #Potentialy modify the name of the file depending on the parameters of the simulation
+    with open(f"results_simulations/{simulation_name}.pkl", "wb") as f: #Potentialy modify the name of the file depending on the parameters of the simulation
         pickle.dump(idata, f)
     
     # axes_arr = az.plot_trace(idata)
@@ -90,8 +87,13 @@ def run_model():
     # plt.show()
 
 if __name__=="__main__":
-    run_model()
+    #run_model()
     #print(get_species_list("crohns.csv"))
+    filename="data/crohns.csv"
+    (covariate_matrix_data,counts_matrix_data,Z_vector)=get_data(filename)
+    first_group,second_group=separate_data_in_two_groups(covariate_matrix_data,counts_matrix_data,Z_vector)
+    run_model(first_group[0],first_group[1],simulation_name="simulation_group_0")
+    run_model(second_group[0],second_group[1],simulation_name="simulation_group_1")
 
     
 

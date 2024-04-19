@@ -51,3 +51,16 @@ def get_data(file_name):
     #print("Matrice Data Y:\n", counts_matrix)
 
     return(covariate_matrix,counts_matrix,Z_vector)
+
+def separate_data_in_two_groups(covariate_matrix_data,counts_matrix_data,Z_vector):
+
+    first_group=[covariate_matrix_data[Z_vector==0],counts_matrix_data[Z_vector==0]]
+    second_group=[covariate_matrix_data[Z_vector==1],counts_matrix_data[Z_vector==1]]
+    return (first_group,second_group)
+
+if __name__=="__main__":
+    covariate_matrix,counts_matrix,Z_vector=get_data("data/crohns.csv")
+    first_group,second_group=separate_data_in_two_groups(covariate_matrix,counts_matrix,Z_vector)
+    print(first_group[0].shape,first_group[1].shape)
+    print(second_group[0].shape,second_group[1].shape)
+    
