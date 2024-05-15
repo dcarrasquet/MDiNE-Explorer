@@ -33,13 +33,18 @@ def get_data(file_name):
             
             # Convertir les éléments de la ligne en float (sauf la première colonne si elle contient des identifiants)
             ligne_float = [float(valeur) for valeur in ligne_transformee]
+
+            #print(ligne_float)
             
             # Stocker les données des colonnes 2 à 5 dans une liste
-            donnees_colonnes_2_5.append(ligne_float[1:5])
+            donnees_colonnes_2_5.append(ligne_float[2:5])
             Z_vector.append(ligne_float[1])
             
             # Stocker les données des colonnes 6 à 11 dans une liste
             donnees_colonnes_6_11.append(ligne_float[5:12])
+
+        #print(donnees_colonnes_2_5)
+        #print(donnees_colonnes_6_11)
         
     # Convertir les listes en matrices numpy
     covariate_matrix = np.array(donnees_colonnes_2_5)
@@ -59,8 +64,8 @@ def separate_data_in_two_groups(covariate_matrix_data,counts_matrix_data,Z_vecto
     return (first_group,second_group)
 
 if __name__=="__main__":
-    covariate_matrix,counts_matrix,Z_vector=get_data("data/crohns.csv")
-    first_group,second_group=separate_data_in_two_groups(covariate_matrix,counts_matrix,Z_vector)
+    (covariate_matrix_data,counts_matrix_data,Z_vector)=get_data("data/crohns.csv")
+    first_group,second_group=separate_data_in_two_groups(covariate_matrix_data,counts_matrix_data,Z_vector)
     print(first_group[0].shape,first_group[1].shape)
     print(second_group[0].shape,second_group[1].shape)
     
