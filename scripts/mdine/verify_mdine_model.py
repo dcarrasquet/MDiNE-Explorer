@@ -19,7 +19,7 @@ import json
 
 #from MDiNE_model import run_model
 
-from extract_data_files import get_data,separate_data_in_two_groups
+from mdine.extract_data_files import get_data,separate_data_in_two_groups
 
 def create_json_file_model():
 

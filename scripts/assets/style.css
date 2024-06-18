@@ -1,0 +1,22 @@
+#validate-taxa-button, #validate-covariate-button {
+    background: #4CAF50;
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    margin: 10px;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+#validate-taxa-button:hover, #validate-covariate-button:hover {
+    background: #45a049; /* You can define a hover style if needed */
+}
+
+#validate-taxa-button:disabled, #validate-covariate-button:disabled {
+    background: grey;
+    color: white; /* Keep the text color white for better readability */
+    cursor: not-allowed;
+}
+

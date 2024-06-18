@@ -17,11 +17,15 @@ import os
 import arviz as az
 import matplotlib.pyplot as plt
 
+import pandas as pd
+
+import sys
 
 
-from extract_data_files import get_data
-from extract_data_files import separate_data_in_two_groups
-from verify_mdine_model import generate_counts_data_Multinomial,generate_counts_data_ZINB
+
+from mdine.extract_data_files import get_data
+from mdine.extract_data_files import separate_data_in_two_groups
+from mdine.verify_mdine_model import generate_counts_data_Multinomial,generate_counts_data_ZINB
 
 
 print(f"Running on PyMC v{pm.__version__}")
@@ -90,14 +94,69 @@ def run_simulation(path_json_file):
     return 0
 
 
-# def test_mdine_generated_data():
-#     nb_tests=2
-#     for i in range (nb_tests):
-#         folder=f"results/mdine_generated_data_2/simulation_{i}/"
-#         (X_matrix,counts_matrix)=generate_data_mdine(folder)
-#         beta_matrix_choice="Ridge"
-#         precision_matrix_choice="exp_Laplace"
-#         run_model(X_matrix,counts_matrix,beta_matrix_choice,precision_matrix_choice,folder)
+def simulation_data_R(filename):
+
+    folder_parent = 'data_R/'
+
+    # Liste pour stocker les noms des sous-dossiers
+    sub_folders = []
+
+    # Parcourir tous les éléments dans le dossier parent
+    for element in os.listdir(folder_parent):
+        # Vérifier si l'élément est un dossier
+        complete_path = os.path.join(folder_parent, element)
+        if os.path.isdir(complete_path):
+            # Ajouter le nom du sous-dossier à la liste
+            sub_folders.append(element)
+
+    numbers_simulations = [int(re.search(r'\d+', nom).group()) for nom in sub_folders if re.search(r'\d+', nom)]
+    simulation_number = max(numbers_simulations)+1 if numbers_simulations else 1
+
+    folder_simulation=folder_parent+"/simulation_"+str(simulation_number)+"/"
+    os.makedirs(folder_simulation)
+
+    model_parameters={
+    "beta_matrix": {
+        "apriori": "Ridge",
+        "parameters": {
+            "alpha": 1,
+            "beta": 1
+        }
+    },
+    "precision_matrix": {
+        "apriori": "Lasso",
+        "parameters": {
+            "lambda_init": 10
+        }
+    }}
+
+    with open(filename, 'r') as f:
+        data = json.load(f)
+        for i in range (len(data)):
+            counts= pd.DataFrame(data[i]["Counts"])
+            covariates=pd.DataFrame(data[i]["X"])
+            beta=data[i]["beta"]
+            prec0=data[i]["Prec0"]
+            prec1=data[i]["Prec1"]
+            Z=data[i]["Z"]
+
+            counts_0=counts[Z==0]
+            counts_1=counts[Z==1]
+            covariates_0=covariates[Z==0]
+            covariates_1=covariates[Z==1]
+
+            run_model(covariates_0,counts_0,model_parameters,folder_simulation+f"test_{i}_group_0")
+            run_model(covariates_1,counts_1,model_parameters,folder_simulation+f"test_{i}_group_1")
+
+            
+
+def terminal_run_model():
+    covariate_matrix_data=sys.argv[1]
+    counts_matrix_data=sys.argv[2]
+    simulation=sys.argv[3]
+    folder=sys.argv[4]
+    run_model(covariate_matrix_data,counts_matrix_data,simulation,folder)
+
 
 
 def run_model(covariate_matrix_data,counts_matrix_data,simulation,folder):
@@ -263,9 +322,11 @@ def run_model(covariate_matrix_data,counts_matrix_data,simulation,folder):
 
         #mdine_model.debug()
 
-        liste_sum_counts=[]
-        for i in range(n_individuals):
-            liste_sum_counts.append(sum(counts_matrix_data[i]))
+        # liste_sum_counts=[]
+        # for i in range(n_individuals):
+        #     liste_sum_counts.append(sum(counts_matrix_data[i]))
+
+        liste_sum_counts = counts_matrix_data.sum(axis=1).tolist()
 
         ###Matrice des comptes estimées, loi multinomiale
 
@@ -279,7 +340,13 @@ def run_model(covariate_matrix_data,counts_matrix_data,simulation,folder):
 
     with mdine_model:
         #mdine_model.debug()
-        idata = pm.sample(1000) ## 10000 normally
+        #idata = pm.sample(1000) ## 10000 normally
+        print("Je vais faire un fit")
+        idata=None
+        mean_field=pm.fit()
+        print("Mean field", mean_field)
+
+
 
     # Beta_matrix=idata.posterior.beta_matrix.values[3][-1]
 
@@ -360,8 +427,14 @@ def run_model(covariate_matrix_data,counts_matrix_data,simulation,folder):
     # with open(f"results_simulations/{simulation_name}.pkl", "wb") as f: #Potentialy modify the name of the file depending on the parameters of the simulation
     #     pickle.dump(idata, f)
 
-    with open(folder+"idata.pkl", "wb") as f: #Potentialy modify the name of the file depending on the parameters of the simulation
-        pickle.dump(idata, f)
+    if idata!=None:
+        with open(folder+"idata.pkl", "wb") as f: #Potentialy modify the name of the file depending on the parameters of the simulation
+            pickle.dump(idata, f)
+    
+    if mean_field!=None:
+        with open(folder+"mean_field.pkl", "wb") as f: #Potentialy modify the name of the file depending on the parameters of the simulation
+            pickle.dump(mean_field, f)
+
     
     # axes_arr = az.plot_trace(idata)
     # plt.draw()
@@ -426,8 +499,8 @@ def estimate_lambda_init(covariate_matrix_data,counts_matrix_data):
         
         two_groups=True
         if two_groups==True:
-            first_residual=residual_matrix[Z_vector==0]
-            second_residual=residual_matrix[Z_vector==1]
+            first_residual=residual_matrix ### Manque Z
+            second_residual=residual_matrix ### Z Vector manquant
 
         first_precision_matrix=np.linalg.pinv(np.cov(first_residual))
         second_precision_matrix=np.linalg.pinv(np.cov(second_residual))
@@ -446,7 +519,8 @@ def estimate_lambda_init(covariate_matrix_data,counts_matrix_data):
 
 if __name__=="__main__":
 
-    run_simulation("test_mdine/examples_json_simulation/ridge_lasso.json")
+
+    #run_simulation("test_mdine/examples_json_simulation/ridge_lasso_5.json")
     #run_simulation("test_mdine/examples_json_simulation/horseshoe_lasso.json")
 
     #test_wishart(3)
