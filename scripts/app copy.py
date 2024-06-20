@@ -81,48 +81,13 @@ footer_style={
     'padding': '20px 0',
 }
 
-initial_info_current_file={
-    'filename':None,
-    'session_folder':None,
-    'nb_rows':None,
-    'nb_columns':None,
-    'covar_start':None,
-    'covar_end':None,
-    'taxa_start':None,
-    'taxa_end':None,
-    'reference_taxa':None,
-    'phenotype_column':None,
-    'first_group':None,
-    'second_group':None,
-    'filter_zeros':None,
-    'filter_dev_mean':None,
-    'df_taxa':None,
-    'df_covariates':None,
-    'status-run-model':'not-yet',
-    'parameters_model':{
-        'beta_matrix':{
-            'apriori':'Ridge',
-            'parameters':{
-                'alpha':1,
-                'beta':1
-            }
-        },
-        'precision_matrix':{
-            'apriori':'Lasso',
-            'parameters':{
-                'lambda_init':10
-            }
-        }
-    }
-}
-
 def make_layout():
     return html.Div(children=[
         html.Div(style={"padding-bottom": "10vh"},children=[
         # Barre de navigation
         html.Nav(style=nav_style, className="navbar", children=[
             html.Div(className="navbar-brand"),
-            dcc.Store(id='info-current-file', storage_type=type_storage,data=initial_info_current_file),
+            #dcc.Store(id='actual-tab-store', storage_type=type_storage),
             html.Div(className="navbar-menu", style={'justifyContent': 'center', 'width': '100%'}, children=[
                 dcc.Tabs(id="tabs-example", value='tab-home', style={'width': '100%'},persistence=True,persistence_type=type_storage, children=[
                     dcc.Tab(label='Home', value='tab-home', style=tab_style, selected_style=selected_tab_style),
@@ -135,37 +100,25 @@ def make_layout():
         ]),
 
         # Contenu principal
-        html.Div(className="container",children=[
-            html.Div(id='div-home',children=[layout_home()]),
-        html.Div(id='div-data',children=[layout_data()]),
-        html.Div(id='div-model',children=[layout_model()]),
-        html.Div(id='div-visu',children=[layout_visualization()]),
-        html.Div(id='div-export',children=[layout_export_results()])
-        ])
-        
+        html.Div(id='tabs-content', className="container")
         ]),
 
         #html.Footer("This is the footer", style=footer_style)
     ])
 
-@app.callback(Output('div-home', 'style'),
-              Output('div-data', 'style'),
-              Output('div-model', 'style'),
-              Output('div-visu', 'style'),
-              Output('div-export', 'style'),
+@app.callback(Output('tabs-content', 'children'),
               [Input('tabs-example', 'value')])
 def render_content(tab):
-    display_none={'display':'none'}
     if tab == 'tab-home':
-        return None,display_none,display_none,display_none,display_none
+        return layout_home()
     elif tab == 'tab-data':
-        return display_none,None,display_none,display_none,display_none
+        return layout_data()
     elif tab == 'tab-model':
-        return display_none,display_none,None,display_none,display_none
+        return layout_model()
     elif tab == 'tab-visualization':
-        return display_none,display_none,display_none,None,display_none
+        return layout_visualization()
     elif tab == 'tab-export':
-        return display_none,display_none,display_none,display_none,None
+        return layout_export_results()
 
 
 if __name__=="__main__":

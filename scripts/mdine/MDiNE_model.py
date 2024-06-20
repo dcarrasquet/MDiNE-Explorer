@@ -23,9 +23,37 @@ import sys
 
 
 
-from mdine.extract_data_files import get_data
+from mdine.extract_data_files import get_separate_data
 from mdine.extract_data_files import separate_data_in_two_groups
 from mdine.verify_mdine_model import generate_counts_data_Multinomial,generate_counts_data_ZINB
+from maindash import info_current_file
+
+# def run_model_terminal():
+#     global info_current_file
+
+#     try:
+
+#         choice_run_model=sys.argv[1] ## 2 choices: one_group, two_groups
+
+#         if choice_run_model=="one_group":
+#             run_model(info_current_file["df_covariates"],info_current_file["df_taxa"],info_current_file["parameters_model"],info_current_file["session_folder"])
+#             info_current_file["status-run-model"]="completed"
+
+#         elif choice_run_model=="two_groups":
+#             [df_covariates_1,df_taxa_1],[df_covariates_2,df_taxa_2]=get_separate_data(info_current_file)
+#             path_first_group=os.path.join(info_current_file["session_folder"],"first_group/")
+#             path_second_group=os.path.join(info_current_file["session_folder"],"second_group/")
+#             print("Je vais lancer le premier modele")
+#             run_model(df_covariates_1,df_taxa_1,info_current_file["parameters_model"],path_first_group)
+#             print("Je vais lancer le deuxième modele")
+#             run_model(df_covariates_2,df_taxa_2,info_current_file["parameters_model"],path_second_group)
+#         else:
+#             print("Argument not valid")
+
+#     except:
+#         info_current_file["status-run-model"]="error"
+    
+    
 
 
 print(f"Running on PyMC v{pm.__version__}")
@@ -486,8 +514,8 @@ def estimate_lambda_init(covariate_matrix_data,counts_matrix_data):
 
         Beta_matrix=idata.posterior.beta_matrix.values[3][-1]
 
-        print("Beta Matrix:\n")
-        print(Beta_matrix)
+        # print("Beta Matrix:\n")
+        # print(Beta_matrix)
 
         product_X_B=np.dot(covariate_matrix_data,Beta_matrix)
 
@@ -518,6 +546,7 @@ def estimate_lambda_init(covariate_matrix_data,counts_matrix_data):
     return lambda_init
 
 if __name__=="__main__":
+    pass
 
 
     #run_simulation("test_mdine/examples_json_simulation/ridge_lasso_5.json")
@@ -530,8 +559,8 @@ if __name__=="__main__":
     # (covariate_matrix_data,counts_matrix_data,Z_vector)=get_data(filename)
     # first_group,second_group=separate_data_in_two_groups(covariate_matrix_data,counts_matrix_data,Z_vector)
 
-    beta_matrix_choice="Ridge" #Spike_and_slab Normal Lasso Horseshoe
-    precision_matrix_choice="exp_Laplace" #exp_Laplace ou invwishart ou invwishart_penalized
+    #beta_matrix_choice="Ridge" #Spike_and_slab Normal Lasso Horseshoe
+    #precision_matrix_choice="exp_Laplace" #exp_Laplace ou invwishart ou invwishart_penalized
     # stringenplus="_Lambda2"
 
     # simulation_name_0="simulation_group_0_"+beta_matrix_choice+"_"+precision_matrix_choice+stringenplus
@@ -539,7 +568,7 @@ if __name__=="__main__":
 
     # #estimate_lambda_init(covariate_matrix_data,counts_matrix_data)
 
-    simulation_name="simulation_data_generated_"+beta_matrix_choice+"_"+precision_matrix_choice
+    #simulation_name="simulation_data_generated_"+beta_matrix_choice+"_"+precision_matrix_choice
     # run_model(first_group[0],first_group[1],beta_matrix_choice,precision_matrix_choice,simulation_name_0)
     # #run_model(second_group[0],second_group[1],beta_matrix_choice,precision_matrix_choice,simulation_name_1)
     # Sauvegarder les variables dans un fichier

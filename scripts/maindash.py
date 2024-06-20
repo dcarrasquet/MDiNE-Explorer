@@ -65,7 +65,7 @@ info_current_file={
     'filter_dev_mean':None,
     'df_taxa':None,
     'df_covariates':None,
-    'status-run-model':'completed',
+    'status-run-model':'not-yet',
     'parameters_model':{
         'beta_matrix':{
             'apriori':'Ridge',

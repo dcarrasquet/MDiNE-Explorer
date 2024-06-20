@@ -29,7 +29,7 @@ def layout_export_results():
     return html.Div([
             html.H3('Export Results Page'),
             html.Div([
-                html.Button("Télécharger le fichier", id="download-button",style=button_style),
+                html.Button("Download raw results", id="download-button",style=button_style),
                 dcc.Download(id="download")
             ])
 

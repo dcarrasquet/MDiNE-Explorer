@@ -12,7 +12,7 @@ from scipy.stats import gaussian_kde
 import plotly.graph_objects as go
 
 
-#from mdine.extract_data_files import get_species_list, separate_data_in_two_groups, get_data
+#from extract_data_files import get_species_list, separate_data_in_two_groups, get_data
 from mdine.extract_data_files import get_species_list, separate_data_in_two_groups, get_data
 
 
@@ -946,11 +946,11 @@ def get_energy_figure(idata):
 
     i=0
     for line in ax.get_lines():
-        print("Et de 1")
+        #print("Et de 1")
         x_data = line.get_xdata()
         y_data = line.get_ydata()
-        print("X: ",x_data)
-        print("Y: ",y_data)
+        # print("X: ",x_data)
+        # print("Y: ",y_data)
         if len(x_data)!=0 and len(y_data)!=0:
             trace = go.Scatter(x=x_data, y=y_data, mode='lines', name=trace_names[i])
             i+=1
@@ -1077,10 +1077,21 @@ def get_trace_precision_matrix(idata):
         print(f"Error generating plot: {e}")
         return None
     
+def get_rhat_and_ess():
+
+    filename=f"data/dash_app/session_5/idata.pkl"
+    with open(filename, "rb") as file:
+        idata = pickle.load(file)
+    # print("Rhat:",az.rhat(idata,var_names="beta_matrix").beta_matrix)
+    # print("ESS:",az.ess(idata,var_names="beta_matrix").beta_matrix)
+    print("Rhat:",az.rhat(idata,var_names="precision_matrix").precision_matrix)
+    print("ESS:",az.ess(idata,var_names="precision_matrix").precision_matrix)
+
 
 
 if __name__=="__main__":
-    study_idata_file()
+    #study_idata_file()
+    get_rhat_and_ess()
 
     beta_matrix_choice="Normal" #Spike_and_slab Normal Lasso Horseshoe
     precision_matrix_choice="exp_Laplace" #exp_Laplace ou invwishart ou invwishart_penalized

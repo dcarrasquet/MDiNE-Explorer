@@ -7,6 +7,9 @@ import re
 import base64
 from dash.exceptions import PreventUpdate
 import time
+import queue
+import pty
+import sys
 
 import threading
 import io
@@ -109,8 +112,8 @@ def layout_model():
                                 id='apriori-precision-matrix-input',
                                 options=[
                                     {'label': 'Lasso', 'value': 'Lasso'},
-                                    {'label': 'InvWishart', 'value': 'InvWishart'},
-                                    {'label': 'InvWishart Penalized', 'value': 'InvWishart Penalized'},
+                                    {'label': 'InvWishart', 'value': 'InvWishart','disabled': True},
+                                    {'label': 'InvWishart Penalized', 'value': 'InvWishart Penalized','disabled': True},
                                     
                                 ],
                                 placeholder="Select an option",
@@ -133,8 +136,10 @@ def layout_model():
                     ], id='advanced-parameters')
                 ], id='details',open=False),
                 html.Button('Run Model', id='run-model-button', n_clicks=0,style=button_style),
+                dcc.Interval(id='interval-component',interval=5 * 1000, n_intervals=0),
                 dcc.Store(id='run-model-status', storage_type=type_storage),
                 html.Div(id="run-model-output"),
+                html.Div(id="output-area"),
 
 
 
@@ -336,7 +341,43 @@ def on_data(ts, data):
         else:
             return "Error"
 
+output_queue = queue.Queue() 
+def read_output(fd):
+    buffer = b''
+    for _ in range(20):
+    # while True:
+        try:
+            chunk = os.read(fd, 1024)
+            #print("Chunk reussi")
+            #print("Chunk: ",chunk)
+        except OSError:
+            break
+        buffer += chunk
+        #buffer = chunk
+        lines = buffer.splitlines()
+        #print("Lines: ",lines)
+        for line in lines[:-1]:
+            output_queue.put(line.decode().strip())
+        buffer = lines[-1]
+        #print("Buffer: ",buffer)
+        output_queue.put(buffer.decode().strip())
+        print("Output buffer:",buffer)
+    if buffer:
+        print("Je suis rentre pas icii")
+        output_queue.put(buffer.decode().strip())
 
+def execute_model(choice_run_model):
+    pid, fd = pty.fork()
+    if pid == 0:
+        # Processus enfant : exécute le script long_task_script.py
+        current_working_directory = os.getcwd()
+        #os.chdir(current_working_directory)  # Changer le répertoire de travail
+        #os.execvp("pwd", ["pwd"])
+        
+        os.execvp(sys.executable, [sys.executable, 'scripts/mdine/model_run_terminal.py',choice_run_model])
+    else:
+        # Processus parent : lit la sortie du processus enfant
+        read_output(fd)
 
 # add a click to the appropriate store.
 @app.callback(Output('run-model-status', 'data'),
@@ -345,6 +386,8 @@ def on_data(ts, data):
 def on_click(n_clicks,data):
 
     data = data or {'run_model': False}
+
+    print("Actual data run model: ",data)
 
     # if n_clicks==0:
     #     # prevent the None callbacks is important with the store component.
@@ -359,9 +402,11 @@ def on_click(n_clicks,data):
 
 # output the stored clicks in the table cell.
 @app.callback(Output("run-model-output", 'children'),
+              Output("output-area","children"),
             Input('run-model-status', 'modified_timestamp'),
+            Input('interval-component', 'n_intervals'),
             State('run-model-status','data'))
-def on_data(ts,data):
+def on_data(ts,n_intervals,data):
     global info_current_file
 
     if ts is None:
@@ -369,35 +414,75 @@ def on_data(ts,data):
 
     data = data or {}
 
-    if data.get('run_model',False)==False:
-        return html.H5("Fonction pas encore lancée")
-    elif info_current_file["status-run-model"]=="in-progress" or info_current_file["status-run-model"]=="completed":
-        return "Tu as deja lancer le modele tu vas pas le faire deux fois quand meme"
-    else:
-        print("Je vais lancer l'inférence")
-        if info_current_file["phenotype_column"]==None:
-            info_current_file["status-run-model"]="in-progress"
-            try:
-                run_model(info_current_file["df_covariates"],info_current_file["df_taxa"],info_current_file["parameters_model"],info_current_file["session_folder"])
-                info_current_file["status-run-model"]="completed"
-            except:
-                info_current_file["status-run-model"]="error"
-        else:
-            try:
-                info_current_file["status-run-model"]="in-progress"
-                [df_covariates_1,df_taxa_1],[df_covariates_2,df_taxa_2]=get_separate_data(info_current_file)
-                path_first_group=os.path.join(info_current_file["session_folder"],"first_group/")
-                path_second_group=os.path.join(info_current_file["session_folder"],"second_group/")
-                print("Je vais lancer le premier modele")
-                run_model(df_covariates_1,df_taxa_1,info_current_file["parameters_model"],path_first_group)
-                print("Je vais lancer le deuxième modele")
-                run_model(df_covariates_2,df_taxa_2,info_current_file["parameters_model"],path_second_group)
-                print("Les deux simualtions sont terminées")
-                info_current_file["status-run-model"]="completed"
-            except:
-                info_current_file["status-run-model"]="error"
+    #print("Status run model ",info_current_file["status-run-model"])
 
-        return html.H5("Fonction lancée!")
+    if data.get('run_model',False)==False:
+        return html.H5("Fonction pas encore lancée"),html.H5("Truc pas encore lancé")
+    
+    ctx = dash.callback_context
+
+    if not ctx.triggered:
+        trigger = 'No input has triggered yet'
+    else:
+        trigger = ctx.triggered[0]['prop_id'].split('.')[0]
+
+    print("Trigger: ",trigger)
+
+    if trigger == 'run-model-status' and info_current_file["status-run-model"]=="not-yet":
+        # 'Run Model button was clicked'
+        if info_current_file["phenotype_column"]==None:
+            print("J'execute le premier modele")
+            threading.Thread(target=execute_model,args=("one_group",)).start()
+        else:
+            threading.Thread(target=execute_model,args=("two_groups",)).start()
+        return None, None 
+    elif trigger == 'interval-component':
+        #'Interval component was triggered'
+        last_output = ''
+        while not output_queue.empty():
+            last_output = output_queue.get()
+
+        return html.H5("Fonction lancée!"),last_output
+    else:
+        return None,None
+    
+    # if info_current_file["status-run-model"]=="in-progress" or info_current_file["status-run-model"]=="completed":
+    #     return "Tu as deja lancer le modele tu vas pas le faire deux fois quand meme",html.H5("Pas deux fois")
+    # else:
+    #     print("Je vais lancer l'inférence")
+    #     if info_current_file["phenotype_column"]==None:
+    #         threading.Thread(target=execute_model,args=("one_group")).start()
+    #     else:
+    #         threading.Thread(target=execute_model,args=("two_groups")).start()
+    # else:
+    #     print("Je vais lancer l'inférence")
+    #     if info_current_file["phenotype_column"]==None:
+    #         info_current_file["status-run-model"]="in-progress"
+    #         try:
+    #             run_model(info_current_file["df_covariates"],info_current_file["df_taxa"],info_current_file["parameters_model"],info_current_file["session_folder"])
+    #             info_current_file["status-run-model"]="completed"
+    #         except:
+    #             info_current_file["status-run-model"]="error"
+    #     else:
+    #         try:
+    #             info_current_file["status-run-model"]="in-progress"
+    #             [df_covariates_1,df_taxa_1],[df_covariates_2,df_taxa_2]=get_separate_data(info_current_file)
+    #             path_first_group=os.path.join(info_current_file["session_folder"],"first_group/")
+    #             path_second_group=os.path.join(info_current_file["session_folder"],"second_group/")
+    #             print("Je vais lancer le premier modele")
+    #             run_model(df_covariates_1,df_taxa_1,info_current_file["parameters_model"],path_first_group)
+    #             print("Je vais lancer le deuxième modele")
+    #             run_model(df_covariates_2,df_taxa_2,info_current_file["parameters_model"],path_second_group)
+    #             print("Les deux simualtions sont terminées")
+    #             info_current_file["status-run-model"]="completed"
+    #         except:
+    #             info_current_file["status-run-model"]="error"
+        # Récupérer la dernière ligne de la file d'attente
+        # last_output = ''
+        # while not output_queue.empty():
+        #     last_output = output_queue.get()
+
+        # return html.H5("Fonction lancée!"),last_output
 
 @app.callback(
     Output("apriori-beta-input","value"),

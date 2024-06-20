@@ -56,7 +56,7 @@ def layout_data():
     return html.Div([
           html.Div([
             html.H3('Import Data file',style={'display': 'inline-block'}),
-            html.Span("i", id="info-icon", title="Only csv and tsv files are accepted.",
+            html.Span("i", id="info-icon-file", title="Only csv and tsv files are accepted.",
               style={'display': 'inline-block', 'marginLeft': '10px',
                      'width': '20px', 'height': '20px', 'borderRadius': '50%',
                      'backgroundColor': '#007BFF', 'color': 'white', 'textAlign': 'center',
@@ -94,6 +94,7 @@ def layout_data():
     html.Div(id='output-df-upload'),
     
     html.Br(),
+    dcc.Store(id='all-checks-status', storage_type=type_storage),
     html.Div(style={'display': 'inline-block','vertical-align': 'middle'},children=[
         dcc.Store(id='interval-covariate-status', storage_type=type_storage),
           html.H5("Interval of covariate columns ",style={'display': 'inline-block'}),
@@ -114,7 +115,7 @@ def layout_data():
     html.Div(children=[
         html.H5("Presence of a reference taxa",style={'display': 'inline-block','margin-right': '10px'}),
         dcc.Checklist(options=[{'label': '', 'value': 'checked',"disabled":True}],value=[],id='check-ref-taxa',persistence=True,persistence_type=type_storage,style={'display': 'inline-block'}),
-        html.Span("i", id="info-icon", title='''The reference taxa is a species with a low deviation/mean ratio. It will not be plotted on the final network. If no species is given by the user, the species with the lowest ratio will be chosen by default.''',
+        html.Span("i", id="info-icon-file", title='''The reference taxa is a species with a low deviation/mean ratio. It will not be plotted on the final network. If no species is given by the user, the species with the lowest ratio will be chosen by default.''',
               style={'display': 'inline-block', 'marginLeft': '10px',
                      'width': '20px', 'height': '20px', 'borderRadius': '50%',
                      'backgroundColor': '#007BFF', 'color': 'white', 'textAlign': 'center',
@@ -483,6 +484,39 @@ def on_data(ts_cov,ts_taxa,data_cov,data_taxa,check_ref_taxa,check_separate_data
         return check_intervals(data_cov["value"],data_taxa["value"],check_ref_taxa,check_separate_data,check_filter_zeros,check_filter_dev_mean)
 
 
+# @app.callback(
+#         Output('all-checks-status','data'),
+#         Input('check-ref-taxa','value'),
+#         Input('check-separate-data','value'),
+#         Input("check-filter-deviation-mean","value"),
+#         Input("check-filter-columns-zero","value"),
+#         State('all-checks-status','data'),
+# )
+# def on_data(taxa,separate_data,filter_dev_mean,filter_zeros,data):
+#     default_data={'ref-taxa':[],
+#                   'separate-data':[],
+#                   'filter-dev-mean':[],
+#                   'filter-zeros':[]}
+#     data['ref-taxa']=taxa
+
+#     data=data or default_data
+
+def on_click(n_clicks_cov,n_clicks_taxa,value_cov,value_taxa,data_cov,data_taxa):
+    if n_clicks_cov==None and n_clicks_taxa==None and value_cov==None and value_taxa==None:
+        # prevent the None callbacks is important with the store component.
+        # you don't want to update the store for nothing.
+        raise PreventUpdate
+
+    
+    data_cov = data_cov or {'value': ""}
+    data_taxa = data_taxa or {'value': ""}
+    
+    if value_cov!=None:
+        data_cov["value"]=value_cov
+    if value_taxa!=None:
+        data_taxa["value"]=value_taxa
+
+    return data_cov,data_taxa
 
 ###### Select Taxa and groups ######
 
