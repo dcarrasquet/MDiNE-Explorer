@@ -23,40 +23,23 @@ import sys
 
 
 
-from mdine.extract_data_files import get_separate_data
-from mdine.extract_data_files import separate_data_in_two_groups
-from mdine.verify_mdine_model import generate_counts_data_Multinomial,generate_counts_data_ZINB
-from maindash import info_current_file
-
-# def run_model_terminal():
-#     global info_current_file
-
-#     try:
-
-#         choice_run_model=sys.argv[1] ## 2 choices: one_group, two_groups
-
-#         if choice_run_model=="one_group":
-#             run_model(info_current_file["df_covariates"],info_current_file["df_taxa"],info_current_file["parameters_model"],info_current_file["session_folder"])
-#             info_current_file["status-run-model"]="completed"
-
-#         elif choice_run_model=="two_groups":
-#             [df_covariates_1,df_taxa_1],[df_covariates_2,df_taxa_2]=get_separate_data(info_current_file)
-#             path_first_group=os.path.join(info_current_file["session_folder"],"first_group/")
-#             path_second_group=os.path.join(info_current_file["session_folder"],"second_group/")
-#             print("Je vais lancer le premier modele")
-#             run_model(df_covariates_1,df_taxa_1,info_current_file["parameters_model"],path_first_group)
-#             print("Je vais lancer le deuxième modele")
-#             run_model(df_covariates_2,df_taxa_2,info_current_file["parameters_model"],path_second_group)
-#         else:
-#             print("Argument not valid")
-
-#     except:
-#         info_current_file["status-run-model"]="error"
+# from mdine.extract_data_files import get_separate_data,get_df_covariates,get_df_taxa
+# from mdine.verify_mdine_model import generate_counts_data_Multinomial,generate_counts_data_ZINB
+# from extract_data_files import get_separate_data,get_df_covariates,get_df_taxa
+# from verify_mdine_model import generate_counts_data_Multinomial,generate_counts_data_ZINB
     
-    
+try:
+    # First Try
+    from mdine.extract_data_files import get_separate_data, get_df_covariates, get_df_taxa
+    from mdine.verify_mdine_model import generate_counts_data_Multinomial, generate_counts_data_ZINB
+except ImportError:
+    #Second Try
+    from extract_data_files import get_separate_data, get_df_covariates, get_df_taxa
+    from verify_mdine_model import generate_counts_data_Multinomial, generate_counts_data_ZINB
 
+#File "/Users/damien/Documents/scolarite\xcc\x81/Centrale_Lyon/TFE/travail/mdine_github/scripts/mdine/MDiNE_model.py", line 38, in <module>    from verify_mdine_model import generate_counts_data_Multinomial, generate_counts_data_ZINB  File "/Users/damien/Documents/scolarite\xcc\x81/Centrale_Lyon/TFE/travail/mdine_github/scripts/mdine/verify_mdine_model.py", line 22, in <module>    from mdine.extract_data_files import get_data,separate_data_in_two_groupsModuleNotFoundError: No module named \'mdine\''
 
-print(f"Running on PyMC v{pm.__version__}")
+#print(f"Running on PyMC v{pm.__version__}")
 
 def run_simulation(path_json_file):
 
@@ -368,11 +351,11 @@ def run_model(covariate_matrix_data,counts_matrix_data,simulation,folder):
 
     with mdine_model:
         #mdine_model.debug()
-        #idata = pm.sample(1000) ## 10000 normally
-        print("Je vais faire un fit")
-        idata=None
-        mean_field=pm.fit()
-        print("Mean field", mean_field)
+        idata = pm.sample(1000) ## 10000 normally
+        #print("Je vais faire un fit")
+        # idata=None
+        # mean_field=pm.fit()
+        # print("Mean field", mean_field)
 
 
 
@@ -459,9 +442,9 @@ def run_model(covariate_matrix_data,counts_matrix_data,simulation,folder):
         with open(folder+"idata.pkl", "wb") as f: #Potentialy modify the name of the file depending on the parameters of the simulation
             pickle.dump(idata, f)
     
-    if mean_field!=None:
-        with open(folder+"mean_field.pkl", "wb") as f: #Potentialy modify the name of the file depending on the parameters of the simulation
-            pickle.dump(mean_field, f)
+    # if mean_field!=None:
+    #     with open(folder+"mean_field.pkl", "wb") as f: #Potentialy modify the name of the file depending on the parameters of the simulation
+    #         pickle.dump(mean_field, f)
 
     
     # axes_arr = az.plot_trace(idata)
@@ -545,8 +528,36 @@ def estimate_lambda_init(covariate_matrix_data,counts_matrix_data):
         
     return lambda_init
 
+def run_model_terminal():
+
+
+    info_current_file_store_str=sys.argv[1] ## 2 choices: one_group, two_groups
+
+    info_current_file_store=json.loads(info_current_file_store_str)
+
+    #print("Info_current_file_store: ",info_current_file_store)
+
+    if info_current_file_store["phenotype_column"]==None:
+        #Only one group
+        #print("Choice one grooooop")
+        df_covariates=get_df_covariates(info_current_file_store)
+        df_taxa=get_df_taxa(info_current_file_store,"df_taxa")
+        run_model(df_covariates,df_taxa,info_current_file_store["parameters_model"],info_current_file_store["session_folder"])
+
+    elif info_current_file_store["phenotype_column"]!=None:
+        #print("Two groups!!!")
+        [df_covariates_1,df_taxa_1],[df_covariates_2,df_taxa_2]=get_separate_data(info_current_file_store)
+        path_first_group=os.path.join(info_current_file_store["session_folder"],"first_group/")
+        path_second_group=os.path.join(info_current_file_store["session_folder"],"second_group/")
+        #print("First model started")
+        run_model(df_covariates_1,df_taxa_1,info_current_file_store["parameters_model"],path_first_group)
+        #print("Second model started")
+        run_model(df_covariates_2,df_taxa_2,info_current_file_store["parameters_model"],path_second_group)
+    else:
+        print("Argument not valid")
+
 if __name__=="__main__":
-    pass
+    run_model_terminal()
 
 
     #run_simulation("test_mdine/examples_json_simulation/ridge_lasso_5.json")

@@ -20,3 +20,26 @@
     cursor: not-allowed;
 }
 
+#run-model-button {
+    background: #4CAF50;
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    margin: 10px;
+    display:block;
+    /*vertical-align: middle;*/
+    margin-left: 'auto';
+    margin-right: 'auto';
+}
+
+#run-model-button:hover {
+    background: #45a049; /* You can define a hover style if needed */
+}
+
+#run-model-button:disabled{
+    background: grey;
+    color: white; /* Keep the text color white for better readability */
+    cursor: not-allowed;
+}

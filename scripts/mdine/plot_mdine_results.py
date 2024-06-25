@@ -447,7 +447,7 @@ def get_results_generated_data(test_folder,hdi_probability):
     return FPR,TPR
 
 def get_info(idata):
-    print(idata.sample_stats)
+    return(idata.sample_stats)
 
 def get_forest(idata,list_variables):
 
@@ -889,9 +889,9 @@ def study_idata_file():
 
     #print(az.summary(idata, round_to=2))
 
-    print(idata.keys())
+    #print(idata.keys())
 
-    print(idata.sample_stats.sampling_time)
+    #print(idata.sample_stats.sampling_time)
 
     # list_precision_matrix=idata.posterior.precision_matrix
 
@@ -942,7 +942,7 @@ def get_energy_figure(idata):
     trace_names = ["Energy Marginal", "Energy Transition"]
 
     legend_texts = [text.get_text() for text in ax.legend().get_texts()]
-    print("Legend initiale: ",legend_texts)
+    #print("Legend initiale: ",legend_texts)
 
     i=0
     for line in ax.get_lines():

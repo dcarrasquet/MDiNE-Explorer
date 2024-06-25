@@ -10,15 +10,19 @@ import time
 import queue
 import pty
 import sys
+import json
 
 import threading
 import io
 import contextlib
 
-from maindash import app,info_current_file,type_storage
+from maindash import app,type_storage #info_current_file,
 
-from mdine.MDiNE_model import run_model
-from mdine.extract_data_files import get_separate_data
+# from mdine.MDiNE_model import run_model
+# from mdine.extract_data_files import get_separate_data
+
+model_thread = None
+thread_finished = threading.Event()
 
 button_hover_style = {
     'background': '#4A90E2'
@@ -135,8 +139,8 @@ def layout_model():
                         
                     ], id='advanced-parameters')
                 ], id='details',open=False),
-                html.Button('Run Model', id='run-model-button', n_clicks=0,style=button_style),
-                dcc.Interval(id='interval-component',interval=5 * 1000, n_intervals=0),
+                html.Button('Run Model', id='run-model-button', n_clicks=0),
+                dcc.Interval(id='interval-component',interval=2000, n_intervals=0),
                 dcc.Store(id='run-model-status', storage_type=type_storage),
                 html.Div(id="run-model-output"),
                 html.Div(id="output-area"),
@@ -344,8 +348,8 @@ def on_data(ts, data):
 output_queue = queue.Queue() 
 def read_output(fd):
     buffer = b''
-    for _ in range(20):
-    # while True:
+    #for _ in range(20):
+    while True:
         try:
             chunk = os.read(fd, 1024)
             #print("Chunk reussi")
@@ -359,25 +363,37 @@ def read_output(fd):
         for line in lines[:-1]:
             output_queue.put(line.decode().strip())
         buffer = lines[-1]
+        clean_buffer = remove_ansi_escape_sequences(buffer.decode(errors='replace').strip())
         #print("Buffer: ",buffer)
-        output_queue.put(buffer.decode().strip())
-        print("Output buffer:",buffer)
+        output_queue.put(clean_buffer)
+        #print("Output buffer:",clean_buffer)
     if buffer:
-        print("Je suis rentre pas icii")
-        output_queue.put(buffer.decode().strip())
+        #print("Je suis rentre pas icii")
+        cleaned_buffer = remove_ansi_escape_sequences(buffer.decode(errors='replace').strip())
+        output_queue.put(cleaned_buffer)
 
-def execute_model(choice_run_model):
+def remove_ansi_escape_sequences(text):
+    ansi_escape = re.compile(r'\x1B[@-_][0-?]*[ -/]*[@-~]')
+    return ansi_escape.sub('', text)
+
+def execute_model(info_current_file_store):
+    global thread_finished
     pid, fd = pty.fork()
     if pid == 0:
         # Processus enfant : exécute le script long_task_script.py
-        current_working_directory = os.getcwd()
         #os.chdir(current_working_directory)  # Changer le répertoire de travail
         #os.execvp("pwd", ["pwd"])
+
+        info_current_file_store_str=json.dumps(info_current_file_store)
         
-        os.execvp(sys.executable, [sys.executable, 'scripts/mdine/model_run_terminal.py',choice_run_model])
+        os.execvp(sys.executable, [sys.executable, 'scripts/mdine/MDiNE_model.py',info_current_file_store_str])
     else:
         # Processus parent : lit la sortie du processus enfant
-        read_output(fd)
+        try:
+            read_output(fd)
+        finally:
+            os.waitpid(pid, 0)  # Attend la fin du processus enfant
+            thread_finished.set()  # Signale que le thread est terminé
 
 # add a click to the appropriate store.
 @app.callback(Output('run-model-status', 'data'),
@@ -387,7 +403,7 @@ def on_click(n_clicks,data):
 
     data = data or {'run_model': False}
 
-    print("Actual data run model: ",data)
+    #print("Actual data run model: ",data)
 
     # if n_clicks==0:
     #     # prevent the None callbacks is important with the store component.
@@ -395,19 +411,24 @@ def on_click(n_clicks,data):
     #     raise PreventUpdate 
     
     if n_clicks>0:
-        print("Je passe run model à True")
+        #print("Je passe run model à True")
         data['run_model']=True
     
     return data
 
 # output the stored clicks in the table cell.
-@app.callback(Output("run-model-output", 'children'),
+@app.callback(Output("info-current-file-store", 'data',allow_duplicate=True),
+        Output("run-model-output", 'children'),
               Output("output-area","children"),
+              Output("run-model-button",'disabled'),
+              Output("run-model-button","title"),
             Input('run-model-status', 'modified_timestamp'),
             Input('interval-component', 'n_intervals'),
-            State('run-model-status','data'))
-def on_data(ts,n_intervals,data):
-    global info_current_file
+            State('run-model-status','data'),
+            State('info-current-file-store','data'),prevent_initial_call=True)
+def on_data(ts,n_intervals,data,info_current_file_store):
+
+    global model_thread,thread_finished
 
     if ts is None:
         raise PreventUpdate
@@ -417,7 +438,11 @@ def on_data(ts,n_intervals,data):
     #print("Status run model ",info_current_file["status-run-model"])
 
     if data.get('run_model',False)==False:
-        return html.H5("Fonction pas encore lancée"),html.H5("Truc pas encore lancé")
+        if info_current_file_store["reference_taxa"]!=None or info_current_file_store["covar_end"]!=None:
+            return info_current_file_store,html.H5("Fonction pas encore lancée"),html.H5("Truc pas encore lancé"),False,None
+        else:
+            title="At least one error in the data section, please check the errors."
+            return info_current_file_store,html.H5("Fonction pas encore lancée"),html.H5("Truc pas encore lancé"),True,title
     
     ctx = dash.callback_context
 
@@ -426,63 +451,46 @@ def on_data(ts,n_intervals,data):
     else:
         trigger = ctx.triggered[0]['prop_id'].split('.')[0]
 
-    print("Trigger: ",trigger)
+    #print("Trigger: ",trigger)
 
-    if trigger == 'run-model-status' and info_current_file["status-run-model"]=="not-yet":
+    if trigger == 'run-model-status' and info_current_file_store["status-run-model"]=="not-yet":
         # 'Run Model button was clicked'
-        if info_current_file["phenotype_column"]==None:
-            print("J'execute le premier modele")
-            threading.Thread(target=execute_model,args=("one_group",)).start()
-        else:
-            threading.Thread(target=execute_model,args=("two_groups",)).start()
-        return None, None 
+        #print("Avant le thread")
+        title="You cannot run the model twice. If you want to run another simulation, open a new window. "
+        model_thread=threading.Thread(target=execute_model,args=(info_current_file_store,))
+        model_thread.start()
+        #print("Après le lancement du thread")
+        #print("Thread alive: ",model_thread.is_alive())
+        info_current_file_store["status-run-model"]="in-progress"
+          
+        
+        return info_current_file_store,None, None,True,title
     elif trigger == 'interval-component':
+        title="You cannot run the model twice. If you want to run another simulation, open a new window. "
         #'Interval component was triggered'
         last_output = ''
         while not output_queue.empty():
             last_output = output_queue.get()
+        
+        if check_run_finish(info_current_file_store):
+            #print("Le thread est terminé.")
+            info_current_file_store["status-run-model"] = "completed"
+            
+        # else:
+        #     print("Le thread est toujours en cours d'exécution...")
 
-        return html.H5("Fonction lancée!"),last_output
+        return info_current_file_store,html.H5("Fonction lancée!"),last_output,True,title
     else:
-        return None,None
+        return info_current_file_store,None,None,True,None
     
-    # if info_current_file["status-run-model"]=="in-progress" or info_current_file["status-run-model"]=="completed":
-    #     return "Tu as deja lancer le modele tu vas pas le faire deux fois quand meme",html.H5("Pas deux fois")
-    # else:
-    #     print("Je vais lancer l'inférence")
-    #     if info_current_file["phenotype_column"]==None:
-    #         threading.Thread(target=execute_model,args=("one_group")).start()
-    #     else:
-    #         threading.Thread(target=execute_model,args=("two_groups")).start()
-    # else:
-    #     print("Je vais lancer l'inférence")
-    #     if info_current_file["phenotype_column"]==None:
-    #         info_current_file["status-run-model"]="in-progress"
-    #         try:
-    #             run_model(info_current_file["df_covariates"],info_current_file["df_taxa"],info_current_file["parameters_model"],info_current_file["session_folder"])
-    #             info_current_file["status-run-model"]="completed"
-    #         except:
-    #             info_current_file["status-run-model"]="error"
-    #     else:
-    #         try:
-    #             info_current_file["status-run-model"]="in-progress"
-    #             [df_covariates_1,df_taxa_1],[df_covariates_2,df_taxa_2]=get_separate_data(info_current_file)
-    #             path_first_group=os.path.join(info_current_file["session_folder"],"first_group/")
-    #             path_second_group=os.path.join(info_current_file["session_folder"],"second_group/")
-    #             print("Je vais lancer le premier modele")
-    #             run_model(df_covariates_1,df_taxa_1,info_current_file["parameters_model"],path_first_group)
-    #             print("Je vais lancer le deuxième modele")
-    #             run_model(df_covariates_2,df_taxa_2,info_current_file["parameters_model"],path_second_group)
-    #             print("Les deux simualtions sont terminées")
-    #             info_current_file["status-run-model"]="completed"
-    #         except:
-    #             info_current_file["status-run-model"]="error"
-        # Récupérer la dernière ligne de la file d'attente
-        # last_output = ''
-        # while not output_queue.empty():
-        #     last_output = output_queue.get()
 
-        # return html.H5("Fonction lancée!"),last_output
+def check_run_finish(info_current_file_store):
+    if info_current_file_store["second_group"]!=None:
+        file_path=os.path.join(info_current_file_store["session_folder"],"second_group","idata.pkl")
+    else:
+        file_path=os.path.join(info_current_file_store["session_folder"],"idata.pkl")
+    #print("Exist file: ",os.path.exists(file_path))
+    return os.path.exists(file_path)
 
 @app.callback(
     Output("apriori-beta-input","value"),

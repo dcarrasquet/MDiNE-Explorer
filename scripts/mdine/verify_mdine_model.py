@@ -19,7 +19,10 @@ import json
 
 #from MDiNE_model import run_model
 
-from mdine.extract_data_files import get_data,separate_data_in_two_groups
+try:
+	from mdine.extract_data_files import get_data,separate_data_in_two_groups
+except ImportError:
+	from extract_data_files import get_data,separate_data_in_two_groups
 
 def create_json_file_model():
 
@@ -77,7 +80,7 @@ def test_mdine_on_generated_data():
 			# Ajouter le nom du sous-dossier à la liste
 			sub_folders.append(element)
 
-	print(sub_folders)
+	#print(sub_folders)
 
 	numbers_simulations = [int(re.search(r'\d+', nom).group()) for nom in sub_folders if re.search(r'\d+', nom)]
 	simulation_number = max(numbers_simulations)+1 if numbers_simulations else 1
@@ -114,7 +117,7 @@ def get_info_data_file():
 	sommes = np.sum(first_group[1], axis=1)
 	#variances = np.var(first_group[1], axis=1)
 
-	print("Sommes des lignes:  ",len(sommes))
+	#print("Sommes des lignes:  ",len(sommes))
 
 	zeros_count = 1 - np.count_nonzero(counts_matrix_data, axis=0)/counts_matrix_data.shape[0]
 
@@ -137,8 +140,8 @@ def extract_data_pickle():
 	with open("data/generated_data_mdine/multinomial.pickle", "rb") as fichier:
 		Beta_matrix, precision_matrix,counts_matrix,X_matrix = pickle.load(fichier)
 
-	print("Beta_matrix: \n",Beta_matrix,"\n\n")
-	print("Precision Matrix: \n\n",precision_matrix)
+	#print("Beta_matrix: \n",Beta_matrix,"\n\n")
+	#print("Precision Matrix: \n\n",precision_matrix)
 
 def generate_data_linear_regression():
 
@@ -262,7 +265,7 @@ def generate_counts_data_ZINB(n_individus,k_covariables,j_taxa,folder):
 		for j in range (j_taxa+1):
 			counts_matrix[i,j]=ppf_ZINB(quantiles[i,j],list_n[j],list_p[j],zeros_counts[j])
 
-	print(counts_matrix)
+	#print(counts_matrix)
 
 
 
@@ -414,7 +417,7 @@ def test_cumulative():
 	# Calculer les probabilités cumulatives
 	cumulative_prob = np.arange(len(sorted_data)) /len(sorted_data)
 
-	print(cumulative_prob)
+	#print(cumulative_prob)
 
 	# Tracer la fonction de distribution cumulative
 	plt.plot(sorted_data, cumulative_prob, marker='o', linestyle='-')
@@ -484,9 +487,9 @@ def regression_model(choice_beta_matrix,folder):
 	plt.savefig(folder+choice_beta_matrix+"_ppc_kde.png")
 	#plt.plot()
 
-	print(az.summary(idata, kind="stats"))
+	#print(az.summary(idata, kind="stats"))
 
-	print(idata.sample_stats)
+	#print(idata.sample_stats)
 
 	idata.sample_stats["tree_depth"].plot(col="chain", ls="none", marker=".", alpha=0.3)
 	plt.savefig(folder+choice_beta_matrix+"_sample_stats.png")
@@ -498,7 +501,7 @@ def regression_model(choice_beta_matrix,folder):
 	plt.savefig(folder+choice_beta_matrix+"_posterior.png")
 
 
-	print("Divergence? :",idata.sample_stats["diverging"].sum())
+	#print("Divergence? :",idata.sample_stats["diverging"].sum())
 
 
 	az.plot_trace(idata, var_names=["beta_matrix"])

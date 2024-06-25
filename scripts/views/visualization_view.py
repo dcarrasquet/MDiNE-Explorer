@@ -17,9 +17,9 @@ import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.use('Agg')
 
-from maindash import app,info_current_file, type_storage, elements_graph
+from maindash import app, type_storage #info_current_file
 from mdine.plot_mdine_results import get_elements_co_occurence_network,get_stylesheet_co_occurrence_network,get_stylesheet_diff_network, get_energy_figure,get_acceptance_rate,get_trace_beta,get_trace_precision_matrix
-from mdine.extract_data_files import get_df_file, get_separate_data
+from mdine.extract_data_files import get_df_file, get_separate_data,get_df_taxa
 
 button_download_style = {
     'background': '#4A90E2',
@@ -113,7 +113,7 @@ def layout_visualization():
             html.H3('Visualization Page'),
             dcc.Store(id='legend-store', data=[],storage_type=type_storage),
             dcc.Store(id='tab-status', storage_type=type_storage),
-            dcc.Tabs(id="subtabs", value='subtab-cooccurrence',style={'margin-bottom': '20px'},persistence=True,persistence_type=type_storage, children=[
+            dcc.Tabs(id="subtabs", value='subtab-cooccurrence',style={'margin-bottom': '20px','display':'none'},persistence=True,persistence_type=type_storage, children=[
                 dcc.Tab(label='Co-occurrence networks', value='subtab-cooccurrence'),
                 dcc.Tab(label='Performance metrics', value='subtab-performance')
             ]),
@@ -122,32 +122,45 @@ def layout_visualization():
 
 @app.callback(Output('subtabs-content', 'children'),
               Output('subtabs', 'style'),
-              [Input('subtabs', 'value'),State("legend-store",'data')])
-def render_subcontent(subtab,legend_store):
-    global info_current_file
-    if info_current_file["status-run-model"]=='not-yet':
-        return "The inference has not been launched. Press Run model in the Model tab to view results.",{'display':'none'}
-    elif info_current_file["status-run-model"]=="in-progress":
-        return "The model is running. You can view the current status in the Model tab. Come back later to see the results",{'display':'none'}
-    elif info_current_file["status-run-model"]=="error":
-        return "An error occurred during model execution. Close the current tab and start a new simulation.",{'display':'none'}
-    elif info_current_file["status-run-model"]=="completed":
+              [Input('subtabs', 'value'),State("legend-store",'data'),State('subtabs', 'style'),Input("info-current-file-store",'data')])
+def render_subcontent(subtab,legend_store,subtabs_style,info_current_file_store):
+
+    ctx = callback_context
+
+    if not ctx.triggered:
+        trigger = 'No input has triggered yet'
+    else:
+        trigger = ctx.triggered[0]['prop_id'].split('.')[0]
+
+    if trigger=="info-current-file-store":
+        # if subtabs_style!={'display':'none'}{'margin-bottom': '20px','display':'none'}:
+        if subtabs_style!={'margin-bottom': '20px','display':'none'}:
+            raise PreventUpdate
+    
+    if info_current_file_store["status-run-model"]=='not-yet':
+        return "The inference has not been launched. Press Run model in the Model tab to view results.",{'margin-bottom': '20px','display':'none'}
+    elif info_current_file_store["status-run-model"]=="in-progress":
+        return "The model is running. You can view the current status in the Model tab. Come back later to see the results",{'margin-bottom': '20px','display':'none'}
+    elif info_current_file_store["status-run-model"]=="error":
+        return "An error occurred during model execution. Close the current tab and start a new simulation.",{'margin-bottom': '20px','display':'none'}
+    elif info_current_file_store["status-run-model"]=="completed":
         if subtab == 'subtab-cooccurrence':
-            return layout_co_occurence_networks(legend_store),None
+            return layout_co_occurence_networks(legend_store,info_current_file_store),{'margin-bottom': '20px'}
         elif subtab == 'subtab-performance':
-            return layout_performance_metrics(),None
+            return layout_performance_metrics(),{'margin-bottom': '20px'}
     else:
         print("info current file status run odel not correct")
-        return None,{'display':'none'}
+        return None,{'margin-bottom': '20px','display':'none'}
         
 
-def layout_co_occurence_networks(legend_store):
-    global info_current_file
+def layout_co_occurence_networks(legend_store,info_current_file_store):
 
     switch_networks_diff=None
 
-    if info_current_file["phenotype_column"]==None:
+    if info_current_file_store["phenotype_column"]==None:
         switch_networks_diff=html.Div()
+        file_idata=os.path.join(info_current_file_store["session_folder"],"idata.pkl")
+        df_taxa=get_df_taxa(info_current_file_store)
     else:
         switch_networks_diff=dcc.RadioItems(
             id='checklist-networks',
@@ -161,23 +174,19 @@ def layout_co_occurence_networks(legend_store):
             persistence_type=type_storage,
             style={'margin': '20px 0'}
         )
-        
+        file_idata=os.path.join(info_current_file_store["session_folder"],"first_group","idata.pkl")
+        [df_covariates_1,df_taxa_1],[df_covariates_2,df_taxa_2]=get_separate_data(info_current_file_store)
+        df_taxa=df_taxa_1
         
 
-    #df_taxa=info_current_file["df_taxa"]
-    #file_idata=os.path.join(info_current_file["session_folder"],"idata.pkl")
-    file_idata="data/dash_app/session_5/idata.pkl"
-
-    df_taxa=get_df_file(info_current_file).iloc[:,5:11]
+    
 
     with open(file_idata, "rb") as f:
         idata = pickle.load(f)
 
     
     elements=get_elements_co_occurence_network(df_taxa,legend_store)
-        
-    #elements=co_occurence_network_cytoscape(idata,df_taxa,hdi=0.999,node_size=0.01,edge_width=5)
-    stylesheet=get_stylesheet_co_occurrence_network(idata,df_taxa,legend_store,hdi=0.999,node_size=0.01,edge_width=5,font_size=20)
+    stylesheet=get_stylesheet_co_occurrence_network(idata,df_taxa,legend_store,hdi=0.95,node_size=0.01,edge_width=5,font_size=20)
 
     return html.Div([
                 #html.H4('Co-occurrence networks'),
@@ -208,7 +217,7 @@ def layout_co_occurence_networks(legend_store):
                 min=0.01,
                 max=0.99,
                 #step=1,
-                value=0.8,
+                value=0.95,
                 #marks={i: str(i) for i in range(0, 101, 10)}
                 persistence=True,
                 persistence_type=type_storage,
@@ -286,11 +295,10 @@ def layout_co_occurence_networks(legend_store):
     Input('slider-nodes-size', 'value'),
     Input('slider-font-size', 'value'),
     State('state-separate-groups','children'),
-    State('legend-store','data'),prevent_initial_call='initial_duplicate'
+    State('legend-store','data'),
+    State("info-current-file-store","data"),prevent_initial_call='initial_duplicate'
 )
-def update_graph(credibility, edges_width, nodes_size,font_size,children,legend_store):
-
-    global info_current_file
+def update_graph(credibility, edges_width, nodes_size,font_size,children,legend_store,info_current_file_store):
 
     specific_graph=None
 
@@ -301,24 +309,24 @@ def update_graph(credibility, edges_width, nodes_size,font_size,children,legend_
         specific_graph=None
 
     if specific_graph==None:
-        file_idata="data/dash_app/session_5/idata.pkl"
+        file_idata=os.path.join(info_current_file_store["session_folder"],"idata.pkl")
 
-        df_taxa=get_df_file(info_current_file).iloc[:,5:11]
+        df_taxa=get_df_taxa(info_current_file_store)
 
         with open(file_idata, "rb") as f:
             idata = pickle.load(f)
 
         stylesheet=get_stylesheet_co_occurrence_network(idata,df_taxa,legend_store,hdi=credibility,node_size=nodes_size,edge_width=edges_width,font_size=font_size)
     else:
-        separate_data=get_separate_data(info_current_file)
+        separate_data=get_separate_data(info_current_file_store)
         df_taxa1=separate_data[0][1]
         df_taxa2=separate_data[1][1]
 
         # file_idata1=os.path.join(info_current_file["session_folder"],"first_group","idata.pkl")
         # file_idata2=os.path.join(info_current_file["session_folder"],"second_group","idata.pkl")
 
-        file_idata1=os.path.join("data/dash_app/session_7","first_group","idata.pkl")
-        file_idata2=os.path.join("data/dash_app/session_7","second_group","idata.pkl")
+        file_idata1=os.path.join(info_current_file_store["session_folder"],"first_group","idata.pkl")
+        file_idata2=os.path.join(info_current_file_store["session_folder"],"second_group","idata.pkl")
 
         # file_idata="data/dash_app/session_5/idata.pkl"
 
@@ -373,18 +381,17 @@ def get_image(n_clicks):
     State('slider-edges-width', 'value'),
     State('slider-nodes-size', 'value'),
     State('slider-font-size', 'value'),
-    State('legend-store','data'),prevent_initial_call='initial_duplicate'
+    State('legend-store','data'),
+    State("info-current-file-store","data"),prevent_initial_call='initial_duplicate'
 )
-def change_stylesheet(value,credibility, edges_width, nodes_size,font_size,legend_store):
-
-    global info_current_file
+def change_stylesheet(value,credibility, edges_width, nodes_size,font_size,legend_store,info_current_file_store):
 
     #Function called only if there are two different groups
     
     #df_taxa=info_current_file["df_taxa"]
     #file_idata=os.path.join(info_current_file["session_folder"],"idata.pkl")
 
-    separate_data=get_separate_data(info_current_file)
+    separate_data=get_separate_data(info_current_file_store)
     df_taxa1=separate_data[0][1]
     df_taxa2=separate_data[1][1]
 
@@ -445,84 +452,220 @@ def layout_performance_metrics():
 @app.callback(
     Output("output-graph-dropdown","children"),
     Input("dropdown","value"),
+    State("info-current-file-store","data"),
     #State("output-graph-dropdown"),
 )
-def output_dropdown(list_graphs):
-    global info_current_file
+def output_dropdown(list_graphs,info_current_file_store):
 
     new_children=[]
+
+    two_groups=info_current_file_store["second_group"]
 
 
     if list_graphs!=None:
 
-        file_idata="data/dash_app/session_5/idata.pkl"
+        if two_groups!=None:
+            #Two groups
+            file_idata1=os.path.join(info_current_file_store["session_folder"],"first_group","idata.pkl")
+            file_idata2=os.path.join(info_current_file_store["session_folder"],"second_group","idata.pkl")
 
-        #df_taxa=get_df_file(info_current_file).iloc[:,5:11]
-        with open(file_idata, "rb") as f:
-            idata = pickle.load(f)
+            with open(file_idata1, "rb") as f:
+                idata1 = pickle.load(f)
+
+            with open(file_idata2, "rb") as f:
+                idata2 = pickle.load(f)
+
+        else:
+            file_idata=os.path.join(info_current_file_store["session_folder"],"idata.pkl")
+
+            with open(file_idata, "rb") as f:
+                idata = pickle.load(f)
 
         for graph in list_graphs:
 
             if graph=="energy":
-                energy_figure=get_energy_figure(idata)
+                if two_groups==None:
+                    energy_figure=get_energy_figure(idata)
 
-                new_children.append(html.H5(
-                    "Energy Graph",
-                    style={'textAlign': 'center', 'fontWeight': 'bold'}
-                ))
-                
-                new_children.append(dcc.Graph(figure=energy_figure,style={'width': '90%','margin': '0 auto'}))
+                    new_children.append(html.H5(
+                        "Energy Graph",
+                        style={'textAlign': 'center', 'fontWeight': 'bold'}
+                    ))
+                    
+                    new_children.append(dcc.Graph(figure=energy_figure,style={'width': '90%','margin': '0 auto'}))
+                else:
+                    energy_figure1=get_energy_figure(idata1)
+
+                    new_children.append(html.H5(
+                        "Energy Graph (First Group)",
+                        style={'textAlign': 'center', 'fontWeight': 'bold'}
+                    ))
+                    
+                    new_children.append(dcc.Graph(figure=energy_figure1,style={'width': '90%','margin': '0 auto'}))
+
+                    energy_figure2=get_energy_figure(idata2)
+
+                    new_children.append(html.H5(
+                        "Energy Graph (Second Group)",
+                        style={'textAlign': 'center', 'fontWeight': 'bold'}
+                    ))
+                    
+                    new_children.append(dcc.Graph(figure=energy_figure2,style={'width': '90%','margin': '0 auto'}))
 
             elif graph=="acceptance_rate":
-                acceptance_rate=get_acceptance_rate(idata)
+                if two_groups==None:
+                    acceptance_rate=get_acceptance_rate(idata)
 
-                new_children.append(html.H5(
-                    "Acceptance Rate",
-                    style={'textAlign': 'center', 'fontWeight': 'bold'}
-                ))
+                    new_children.append(html.H5(
+                        "Acceptance Rate",
+                        style={'textAlign': 'center', 'fontWeight': 'bold'}
+                    ))
 
-                new_children.append(dcc.Graph(figure=acceptance_rate,style={'width': '90%','margin': '0 auto'}))
+                    new_children.append(dcc.Graph(figure=acceptance_rate,style={'width': '90%','margin': '0 auto'}))
+                else:
+                    acceptance_rate1=get_acceptance_rate(idata1)
+
+                    new_children.append(html.H5(
+                        "Acceptance Rate (First Group)",
+                        style={'textAlign': 'center', 'fontWeight': 'bold'}
+                    ))
+
+                    new_children.append(dcc.Graph(figure=acceptance_rate1,style={'width': '90%','margin': '0 auto'}))
+
+                    acceptance_rate2=get_acceptance_rate(idata2)
+
+                    new_children.append(html.H5(
+                        "Acceptance Rate (Second Group)",
+                        style={'textAlign': 'center', 'fontWeight': 'bold'}
+                    ))
+
+                    new_children.append(dcc.Graph(figure=acceptance_rate2,style={'width': '90%','margin': '0 auto'}))
+
 
             elif graph=="beta_matrix_trace":
 
-                trace_beta1,trace_beta2=get_trace_beta(idata)
+                if two_groups==None:
 
-                element=html.Div([
-                    html.Div([
-                        dcc.Graph(figure=trace_beta1),
-                    ], style={'width': '50%', 'display': 'inline-block'}),
-                    
-                    html.Div([
-                        dcc.Graph(figure=trace_beta2),
-                    ], style={'width': '50%', 'display': 'inline-block'}),
-                ])
+                    trace_beta1,trace_beta2=get_trace_beta(idata)
 
-                new_children.append(html.H5(
-                    "Beta Matrix Graph",
-                    style={'textAlign': 'center', 'fontWeight': 'bold'}
-                ))
-            
-                new_children.append(element)
+                    element=html.Div([
+                        html.Div([
+                            dcc.Graph(figure=trace_beta1),
+                        ], style={'width': '50%', 'display': 'inline-block'}),
+                        
+                        html.Div([
+                            dcc.Graph(figure=trace_beta2),
+                        ], style={'width': '50%', 'display': 'inline-block'}),
+                    ])
+
+                    new_children.append(html.H5(
+                        "Beta Matrix Graph",
+                        style={'textAlign': 'center', 'fontWeight': 'bold'}
+                    ))
+                
+                    new_children.append(element)
+
+                else:
+
+                    trace_beta1_group1,trace_beta2_group1=get_trace_beta(idata1)
+
+                    element=html.Div([
+                        html.Div([
+                            dcc.Graph(figure=trace_beta1_group1),
+                        ], style={'width': '50%', 'display': 'inline-block'}),
+                        
+                        html.Div([
+                            dcc.Graph(figure=trace_beta2_group1),
+                        ], style={'width': '50%', 'display': 'inline-block'}),
+                    ])
+
+                    new_children.append(html.H5(
+                        "Beta Matrix Graph (First Group)",
+                        style={'textAlign': 'center', 'fontWeight': 'bold'}
+                    ))
+                
+                    new_children.append(element)
+
+                    trace_beta1_group2,trace_beta2_group2=get_trace_beta(idata2)
+
+                    element=html.Div([
+                        html.Div([
+                            dcc.Graph(figure=trace_beta1_group2),
+                        ], style={'width': '50%', 'display': 'inline-block'}),
+                        
+                        html.Div([
+                            dcc.Graph(figure=trace_beta2_group2),
+                        ], style={'width': '50%', 'display': 'inline-block'}),
+                    ])
+
+                    new_children.append(html.H5(
+                        "Beta Matrix Graph (Second Group)",
+                        style={'textAlign': 'center', 'fontWeight': 'bold'}
+                    ))
+                
+                    new_children.append(element)
+
 
             elif graph=="precision_matrix_trace":
-                trace_precision1,trace_precision2=get_trace_precision_matrix(idata)
+                if two_groups==None:
+                    trace_precision1,trace_precision2=get_trace_precision_matrix(idata)
 
-                element=html.Div([
-                    html.Div([
-                        dcc.Graph(figure=trace_precision1),
-                    ], style={'width': '50%', 'display': 'inline-block'}),
-                    
-                    html.Div([
-                        dcc.Graph(figure=trace_precision2),
-                    ], style={'width': '50%', 'display': 'inline-block'}),
-                ])
+                    element=html.Div([
+                        html.Div([
+                            dcc.Graph(figure=trace_precision1),
+                        ], style={'width': '50%', 'display': 'inline-block'}),
+                        
+                        html.Div([
+                            dcc.Graph(figure=trace_precision2),
+                        ], style={'width': '50%', 'display': 'inline-block'}),
+                    ])
 
-                new_children.append(html.H5(
-                    "Precision Matrix Trace",
-                    style={'textAlign': 'center', 'fontWeight': 'bold'}
-                ))
+                    new_children.append(html.H5(
+                        "Precision Matrix Trace",
+                        style={'textAlign': 'center', 'fontWeight': 'bold'}
+                    ))
 
-                new_children.append(element)
+                    new_children.append(element)
+
+                else:
+
+                    trace_precision1_group1,trace_precision2_group1=get_trace_precision_matrix(idata1)
+
+                    element=html.Div([
+                        html.Div([
+                            dcc.Graph(figure=trace_precision1_group1),
+                        ], style={'width': '50%', 'display': 'inline-block'}),
+                        
+                        html.Div([
+                            dcc.Graph(figure=trace_precision2_group1),
+                        ], style={'width': '50%', 'display': 'inline-block'}),
+                    ])
+
+                    new_children.append(html.H5(
+                        "Precision Matrix Trace (First Group)",
+                        style={'textAlign': 'center', 'fontWeight': 'bold'}
+                    ))
+
+                    new_children.append(element)
+
+                    trace_precision1_group2,trace_precision2_group2=get_trace_precision_matrix(idata2)
+
+                    element=html.Div([
+                        html.Div([
+                            dcc.Graph(figure=trace_precision1_group2),
+                        ], style={'width': '50%', 'display': 'inline-block'}),
+                        
+                        html.Div([
+                            dcc.Graph(figure=trace_precision2_group2),
+                        ], style={'width': '50%', 'display': 'inline-block'}),
+                    ])
+
+                    new_children.append(html.H5(
+                        "Precision Matrix Trace (Second Group)",
+                        style={'textAlign': 'center', 'fontWeight': 'bold'}
+                    ))
+
+                    new_children.append(element)
 
             else:
                 print("Error invalid graph name")
@@ -743,8 +886,8 @@ def update_group_data(new_color_list,new_label_list, store_data):
 def create_list_items(selectedNodes,style_div_modify,legend_store):
     if selectedNodes==None:
         raise PreventUpdate
-    print('Je suis appelé')
-    print(selectedNodes)
+    #print('Je suis appelé')
+    #print(selectedNodes)
     style_display_none={'display':'none'}
     if style_div_modify==style_display_none:
         raise PreventUpdate
@@ -802,13 +945,13 @@ def update_group_data(button_list,selectedNodes, store_data):
 
     style_display_none={'display':'none'}
 
-    print("Button list:",button_list)
+    #print("Button list:",button_list)
 
     if any(element is not None for element in button_list)==False:
-        print("Tous égaux à None")
+        #print("Tous égaux à None")
         raise PreventUpdate
     
-    print("Au moins 1 différent de None")
+    #print("Au moins 1 différent de None")
 
     ctx = callback_context
 
@@ -832,7 +975,7 @@ def update_group_data(button_list,selectedNodes, store_data):
                 for node in selectedNodes:
                     group["elements"]=[elem for elem in group["elements"] if elem != node["id"]] #Remove possible selected elements
 
-    print("Store data apres elements selectionnés: ",store_data)
+    #print("Store data apres elements selectionnés: ",store_data)
     return store_data,None,style_display_none
 
 

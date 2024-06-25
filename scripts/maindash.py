@@ -48,42 +48,40 @@ type_storage="session"
 #     }
 # }
 
-info_current_file={
-    'filename':None,
-    'session_folder':None,
-    'nb_rows':None,
-    'nb_columns':None,
-    'covar_start':None,
-    'covar_end':None,
-    'taxa_start':None,
-    'taxa_end':None,
-    'reference_taxa':None,
-    'phenotype_column':None,
-    'first_group':None,
-    'second_group':None,
-    'filter_zeros':None,
-    'filter_dev_mean':None,
-    'df_taxa':None,
-    'df_covariates':None,
-    'status-run-model':'not-yet',
-    'parameters_model':{
-        'beta_matrix':{
-            'apriori':'Ridge',
-            'parameters':{
-                'alpha':1,
-                'beta':1
-            }
-        },
-        'precision_matrix':{
-            'apriori':'Lasso',
-            'parameters':{
-                'lambda_init':10
-            }
-        }
-    }
-}
-
-elements_graph=None
+# info_current_file={
+#     'filename':None,
+#     'session_folder':None,
+#     'nb_rows':None,
+#     'nb_columns':None,
+#     'covar_start':None,
+#     'covar_end':None,
+#     'taxa_start':None,
+#     'taxa_end':None,
+#     'reference_taxa':None,
+#     'phenotype_column':None,
+#     'first_group':None,
+#     'second_group':None,
+#     'filter_zeros':None,
+#     'filter_dev_mean':None,
+#     'df_taxa':None,
+#     'df_covariates':None,
+#     'status-run-model':'not-yet',
+#     'parameters_model':{
+#         'beta_matrix':{
+#             'apriori':'Ridge',
+#             'parameters':{
+#                 'alpha':1,
+#                 'beta':1
+#             }
+#         },
+#         'precision_matrix':{
+#             'apriori':'Lasso',
+#             'parameters':{
+#                 'lambda_init':10
+#             }
+#         }
+#     }
+# }
 
 # info_current_file={
 #     'filename':"data/test_app/crohns-numeric-tsv.tsv",

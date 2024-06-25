@@ -8,10 +8,16 @@ import base64
 from dash.exceptions import PreventUpdate
 import math
 
-from maindash import app,info_current_file, type_storage
+from maindash import app, type_storage #info_current_file,
 #from ..mdine.extract_data_files import get_infos_file
 #from scripts.mdine.extract_data_files import get_infos_file
-from mdine.extract_data_files import get_infos_file,filter_deviation_mean,get_df_file,check_phenotype_column,filter_percent_zeros, get_info_separate_groups,find_reference_taxa
+from mdine.extract_data_files import (
+    get_infos_file,
+    get_df_file,
+    check_phenotype_column,
+    get_info_separate_groups,
+    get_df_taxa,
+    find_reference_taxa)
 
 #data_path="data/test_app/"
 
@@ -115,18 +121,34 @@ def layout_data():
     html.Div(children=[
         html.H5("Presence of a reference taxa",style={'display': 'inline-block','margin-right': '10px'}),
         dcc.Checklist(options=[{'label': '', 'value': 'checked',"disabled":True}],value=[],id='check-ref-taxa',persistence=True,persistence_type=type_storage,style={'display': 'inline-block'}),
-        html.Span("i", id="info-icon-file", title='''The reference taxa is a species with a low deviation/mean ratio. It will not be plotted on the final network. If no species is given by the user, the species with the lowest ratio will be chosen by default.''',
+        html.Span("i", id="info-icon-ref-taxa", title='''The reference taxa is a species with a low deviation/mean ratio. It will not be plotted on the final network. If no species is given by the user, the species with the lowest ratio will be chosen by default.''',
               style={'display': 'inline-block', 'marginLeft': '10px',
                      'width': '20px', 'height': '20px', 'borderRadius': '50%',
                      'backgroundColor': '#007BFF', 'color': 'white', 'textAlign': 'center',
                      'lineHeight': '20px', 'cursor': 'pointer'}),
-        html.Div(id='select-ref-taxa'),
+        html.Div(id='select-ref-taxa',style={'display':'none'},children=[
+          html.H5("Reference taxa column ",style={"text-indent": '30px','display': 'inline-block'}),
+    dcc.Store(id='reference-taxa-status', storage_type=type_storage),
+    dcc.Input(id='reference-taxa-input',type='number',persistence=True,persistence_type=type_storage,style=input_field_number_style),
+    #,min=info_current_file_store['taxa_start'],max=info_current_file_store['taxa_end'],step=1,value=info_current_file_store['taxa_end'],
+    html.Div(id='reference-taxa-output',style={'display':'inline-block'}),
+    
+        ]),
     ]),
 
     html.Div(children=[
         html.H5("Separate data in two groups",style={'display': 'inline-block','margin-right': '10px'}),
         dcc.Checklist(options=[{'label': '', 'value': 'checked',"disabled":True}],value=[],id='check-separate-data',persistence=True,persistence_type=type_storage,style={'display': 'inline-block'}),
-        html.Div(id='select-separate-data'),
+        #html.Div(id='select-separate-data'),
+        html.Div(id='select-separate-data',style={'display': 'none','vertical-align': 'middle'},children=[
+            #style={'display': 'inline-block','vertical-align': 'middle'}
+            html.H5("Phenotype column ",style={"text-indent": '30px','display': 'inline-block'}),
+            dcc.Store(id='phenotype-column-status', storage_type=type_storage),
+            dcc.Input(id='phenotype-column-input',type='number',persistence=True,persistence_type=type_storage,style=input_field_number_style),
+            #min=info_current_file_store['covar_start'],max=info_current_file_store['covar_end'],step=1,value=info_current_file_store['covar_start']
+            html.Div(id='phenotype-column-output',style={'display': 'inline-block'}),
+
+        ]),
     ])
     ]),
 
@@ -179,7 +201,10 @@ def layout_data():
                     html.Div(id="taxa-reference-info",children=[html.H5("Reference Taxa: ",style={"text-indent": '30px'})])
                 ]),
                 html.H5("Individuals: ",style={"text-indent": '15px'},id="rows-info"),
-                html.Div(id="separate-groups-info")
+                html.Div(id="separate-groups-info",children=[
+                    html.Div(id="first-group-info",children=[html.H5("First Group: ",style={"text-indent": '30px'})]),
+                    html.Div(id="second-group-info",children=[html.H5("Second Group: ",style={"text-indent": '30px'})])
+                ])
                 
 
             ]),
@@ -226,12 +251,13 @@ def get_new_session_folder():
 ###### File Upload ######
     
 # add a click to the appropriate store.
-@app.callback(Output('upload-status', 'data'),
+@app.callback(Output("info-current-file-store","data",allow_duplicate=True),
+        Output('upload-status', 'data'),
                 Input("upload-data", 'filename'),
                 Input('upload-data', 'contents'),
-                State('upload-status', 'data'))
-def on_click(filename,contents, data):
-    global info_current_file
+                State('upload-status', 'data'),
+                State("info-current-file-store","data"),prevent_initial_call=True)
+def on_click(filename,contents, data,info_current_file_store):
     if filename is None:
         # prevent the None callbacks is important with the store component.
         # you don't want to update the store for nothing.
@@ -248,12 +274,12 @@ def on_click(filename,contents, data):
             #     filename = content.split('=')[1].strip('"')
         # Enregistrer le fichier sur le serveur avec le même nom que celui déposé
 
-        if info_current_file["session_folder"]==None:
+        if info_current_file_store["session_folder"]==None:
             session_folder=get_new_session_folder()
         else:
-            session_folder=info_current_file["session_folder"]
-            os.remove(info_current_file["filename"])
-            info_current_file["filename"]==None
+            session_folder=info_current_file_store["session_folder"]
+            os.remove(info_current_file_store["filename"])
+            info_current_file_store["filename"]==None
 
 
         with open(os.path.join(session_folder, filename), 'wb') as f:
@@ -264,10 +290,10 @@ def on_click(filename,contents, data):
 
         data["filename"]=filename
 
-        info_current_file["filename"]=os.path.join(session_folder, filename)
-        info_current_file["session_folder"]=session_folder
+        info_current_file_store["filename"]=os.path.join(session_folder, filename)
+        info_current_file_store["session_folder"]=session_folder
 
-        return data
+        return info_current_file_store,data
 
 # output the stored clicks in the table cell.
 @app.callback(Output("output-data-upload", 'children'),
@@ -278,33 +304,34 @@ def on_click(filename,contents, data):
               Output("validate-covariate-button", 'disabled'),
               Output("interval-taxa-input", 'disabled'),
               Output("validate-taxa-button", 'disabled'),
+              Output("info-current-file-store","data",allow_duplicate=True),
                 Input('upload-status', 'modified_timestamp'),
-                State('upload-status', 'data'))
-def on_data(ts, data):
-    global info_current_file
+                State('upload-status', 'data'),
+                State("info-current-file-store","data"),prevent_initial_call=True)
+def on_data(ts, data,info_current_file_store):
     if ts is None:
         raise PreventUpdate
 
     data = data or {}
 
-    print("Data get filename: ",data.get('filename',None))
+    #print("Data get filename: ",data.get('filename',None))
 
-    if info_current_file["filename"]==None:
+    if info_current_file_store["filename"]==None:
         raise PreventUpdate
 
     if data.get('filename',None)==None:
-        return html.Div(),html.Div(),html.Div(),html.Div(),True,True,True,True
+        return html.Div(),html.Div(),html.Div(),html.Div(),True,True,True,True,info_current_file_store
     else:
         #return data.get('filename', "")
         valid_file= html.H5('File successfully downloaded : {}'.format(data.get('filename', "")),style={'display': 'inline-block'})
-        nb_rows,nb_columns=get_infos_file(info_current_file['filename'])
-        dash_table=create_dash_table(get_df_file(info_current_file))
-        info_current_file["nb_rows"]=nb_rows
-        info_current_file["nb_columns"]=nb_columns
+        nb_rows,nb_columns=get_infos_file(info_current_file_store['filename'])
+        dash_table=create_dash_table(get_df_file(info_current_file_store))
+        info_current_file_store["nb_rows"]=nb_rows
+        info_current_file_store["nb_columns"]=nb_columns
         infos_columns=html.H5(f"Number columns: {nb_columns}",style={"text-indent": '15px'})
         infos_rows=html.H5(f"Number rows: {nb_rows}",style={"text-indent": '15px'})
         
-        return  valid_file,dash_table,infos_columns,infos_rows,False,False,False,False
+        return  valid_file,dash_table,infos_columns,infos_rows,False,False,False,False,info_current_file_store
     
 def create_dash_table(df):
     return html.Div([
@@ -337,14 +364,13 @@ def create_dash_table(df):
 #               Output("check-separate-data","options"),
 
 
-def check_intervals(interval_cov,interval_taxa,check_ref_taxa,check_separate_data,check_filter_zeros,check_filter_dev_mean):
-    global info_current_file
+def check_intervals(interval_cov,interval_taxa,check_ref_taxa,check_separate_data,check_filter_zeros,check_filter_dev_mean,info_current_file_store):
 
     # print("Interval cov: ",interval_cov)
     # print("Interval taxa: ",interval_taxa)
 
-    info_current_file["covar_start"],info_current_file["covar_end"]=None,None
-    info_current_file["taxa_start"],info_current_file["taxa_end"]=None,None
+    info_current_file_store["covar_start"],info_current_file_store["covar_end"]=None,None
+    info_current_file_store["taxa_start"],info_current_file_store["taxa_end"]=None,None
 
 
     options_check_boxes=[{'label': '', 'value': 'checked',"disabled":True}]
@@ -364,11 +390,11 @@ def check_intervals(interval_cov,interval_taxa,check_ref_taxa,check_separate_dat
             output_cov=html.H5("Covariates or Taxa field is in wrong order (must have start<end)")
             info_taxa=html.H5("Taxa: Covariates or Taxa field is in wrong order",style={"text-indent": '30px'})
             output_taxa=html.H5("Covariates or Taxa field is in wrong order (must have start<end)")
-        elif max(end_cov,end_taxa)>info_current_file["nb_columns"]:
+        elif max(end_cov,end_taxa)>info_current_file_store["nb_columns"]:
             info_cov=html.H5("Covariates: Interval upper bound too large",style={"text-indent": '30px'})
-            output_cov=html.H5(f"Upper bound to large: {max(end_cov,end_taxa)} (only {info_current_file["nb_columns"]} number)")
+            output_cov=html.H5(f"Upper bound to large: {max(end_cov,end_taxa)} (only {info_current_file_store["nb_columns"]} number)")
             info_taxa=html.H5("Taxa: Interval upper bound too large",style={"text-indent": '30px'})
-            output_taxa=html.H5(f"Upper bound to large: {max(end_cov,end_taxa)} (only {info_current_file["nb_columns"]} number)")
+            output_taxa=html.H5(f"Upper bound to large: {max(end_cov,end_taxa)} (only {info_current_file_store["nb_columns"]} number)")
         elif min(end_cov,end_taxa)>=max(start_taxa,start_cov):
             # Intervals overlap
             info_cov=html.H5("Covariates: Intervals overlap",style={"text-indent": '30px'})
@@ -376,10 +402,8 @@ def check_intervals(interval_cov,interval_taxa,check_ref_taxa,check_separate_dat
             info_taxa=html.H5("Taxa: Intervals overlap",style={"text-indent": '30px'})
             output_taxa=html.H5(f"Intervals Overlap: {min(end_cov,end_taxa)} (upper bound) and {max(start_taxa,start_cov)} (lower bound)")
         else:
-            info_current_file["covar_start"],info_current_file["covar_end"]=start_cov,end_cov
-            info_current_file["taxa_start"],info_current_file["taxa_end"]=start_taxa,end_taxa
-            info_current_file["df_taxa"]=get_df_file(info_current_file).iloc[:,start_taxa-1:end_taxa]
-            info_current_file["df_covariates"]=get_df_file(info_current_file).iloc[:,start_cov-1:end_cov]
+            info_current_file_store["covar_start"],info_current_file_store["covar_end"]=start_cov,end_cov
+            info_current_file_store["taxa_start"],info_current_file_store["taxa_end"]=start_taxa,end_taxa
             output_cov= html.H5(f"Valid interval : {start_cov} - {end_cov}",style={'display': 'inline-block','vertical-align': 'middle'})
             info_cov=html.H5(f"Covariates: {end_cov-start_cov+1}",style={"text-indent": '30px'})
             output_taxa= html.H5(f"Valid interval : {start_taxa} - {end_taxa}",style={'display': 'inline-block','vertical-align': 'middle'})
@@ -403,7 +427,7 @@ def check_intervals(interval_cov,interval_taxa,check_ref_taxa,check_separate_dat
         info_taxa=html.H5(f"Taxa: Covariates or Taxa field is empty or incorrect",style={"text-indent": '30px'})
         output_taxa=html.H5("Covariates or Taxa field is empty or incorrect")
     
-    return output_cov,info_cov,output_taxa,info_taxa,options_check_boxes,options_check_boxes,options_check_boxes,options_check_boxes,values_check[0],values_check[1],values_check[2],values_check[3]
+    return info_current_file_store,output_cov,info_cov,output_taxa,info_taxa,options_check_boxes,options_check_boxes,options_check_boxes,options_check_boxes,values_check[0],values_check[1],values_check[2],values_check[3]
         
 
 
@@ -437,7 +461,8 @@ def on_click(n_clicks_cov,n_clicks_taxa,value_cov,value_taxa,data_cov,data_taxa)
     return data_cov,data_taxa
 
 # output the stored clicks in the table cell.
-@app.callback(Output("interval-covariate-output", 'children'),
+@app.callback(Output("info-current-file-store","data"),
+              Output("interval-covariate-output", 'children'),
               Output("covariates-info","children"),
               Output("interval-taxa-output", 'children'),
               Output("taxa-info","children"),
@@ -456,13 +481,13 @@ def on_click(n_clicks_cov,n_clicks_taxa,value_cov,value_taxa,data_cov,data_taxa)
                 State("check-ref-taxa","value"),
                 State("check-separate-data","value"),
                 State("check-filter-columns-zero","value"),
-                State("check-filter-deviation-mean","value"))
-def on_data(ts_cov,ts_taxa,data_cov,data_taxa,check_ref_taxa,check_separate_data,check_filter_zeros,check_filter_dev_mean):
-    global info_current_file
+                State("check-filter-deviation-mean","value"),
+                State("info-current-file-store","data"))
+def on_data(ts_cov,ts_taxa,data_cov,data_taxa,check_ref_taxa,check_separate_data,check_filter_zeros,check_filter_dev_mean,info_current_file_store):
 
     options_check_boxes=[{'label': '', 'value': 'checked',"disabled":True}]
 
-    if info_current_file["filename"]==None or info_current_file["nb_columns"]==None:
+    if info_current_file_store["filename"]==None or info_current_file_store["nb_columns"]==None:
         raise PreventUpdate
 
     if ts_cov is None and ts_taxa is None:
@@ -472,16 +497,16 @@ def on_data(ts_cov,ts_taxa,data_cov,data_taxa,check_ref_taxa,check_separate_data
     data_taxa=data_taxa or {}
 
     if data_cov.get('value',None)==None or data_taxa.get('value',None)==None:
-        print("Premiere option")
-        return html.Div(),html.Div(),html.Div(),html.Div(),options_check_boxes,options_check_boxes,options_check_boxes,options_check_boxes,[],[],[],[]
+        #print("Premiere option")
+        return info_current_file_store,html.Div(),html.Div(),html.Div(),html.Div(),options_check_boxes,options_check_boxes,options_check_boxes,options_check_boxes,[],[],[],[]
     else:
-        print("Deuxieme option")
+        #print("Deuxieme option")
         # print("Liste des checks: \n")
         # print(check_ref_taxa)
         # print(check_separate_data)
         # print(check_filter_zeros)
         # print(check_filter_dev_mean)
-        return check_intervals(data_cov["value"],data_taxa["value"],check_ref_taxa,check_separate_data,check_filter_zeros,check_filter_dev_mean)
+        return check_intervals(data_cov["value"],data_taxa["value"],check_ref_taxa,check_separate_data,check_filter_zeros,check_filter_dev_mean,info_current_file_store)
 
 
 # @app.callback(
@@ -520,52 +545,107 @@ def on_click(n_clicks_cov,n_clicks_taxa,value_cov,value_taxa,data_cov,data_taxa)
 
 ###### Select Taxa and groups ######
 
-@app.callback(
-    Output('select-ref-taxa', 'children'),
-    Output('taxa-reference-info','children',allow_duplicate=True),
-    [Input('check-ref-taxa', 'value')],prevent_initial_call='initial_duplicate'
-)
-def update_output_taxa(value):
-    if len(value)!=0:
-        return html.Div(style={'display': 'inline-block','vertical-align': 'middle'},children=[
-          html.H5("Reference taxa column ",style={"text-indent": '30px','display': 'inline-block'}),
-    dcc.Store(id='reference-taxa-status', storage_type=type_storage),
-    dcc.Input(id='reference-taxa-input',type='number',min=info_current_file['taxa_start'],max=info_current_file['taxa_end'],step=1,value=info_current_file['taxa_end'],persistence=True,persistence_type=type_storage,style=input_field_number_style),
-    #dcc.Input(id='reference-taxa-input', type='text', placeholder='ex: 124',persistence=True,persistence_type=type_storage,style=input_field_style),
-    #html.Button('Confirm', id='reference-taxa-button', n_clicks=0,style=button_style),
-    html.Div(id='reference-taxa-output',style={'display':'inline-block'}),
-    ]), None
-    else:
-        if info_current_file["taxa_start"]!=None:
-            message=html.H5(f"Reference Taxa: {find_reference_taxa(info_current_file)}",style={"text-indent": '30px'})
-            return None,message
-        else:
-            return None, html.H5("Reference Taxa: Error Enter Taxa interval",style={"text-indent": '30px'})
+# @app.callback(
+#     Output('select-ref-taxa', 'children'),
+#     Output('taxa-reference-info','children',allow_duplicate=True),
+#     [Input('check-ref-taxa', 'value')],
+#     State("info-current-file-store","data"),prevent_initial_call='initial_duplicate'
+# )
+# def update_output_taxa(value,info_current_file_store):
+#     if len(value)!=0:
+#         return html.Div(style={'display': 'inline-block','vertical-align': 'middle'},children=[
+#           html.H5("Reference taxa column ",style={"text-indent": '30px','display': 'inline-block'}),
+#     dcc.Store(id='reference-taxa-status', storage_type=type_storage),
+#     dcc.Input(id='reference-taxa-input',type='number',min=info_current_file_store['taxa_start'],max=info_current_file_store['taxa_end'],step=1,value=info_current_file_store['taxa_end'],persistence=True,persistence_type=type_storage,style=input_field_number_style),
+#     #dcc.Input(id='reference-taxa-input', type='text', placeholder='ex: 124',persistence=True,persistence_type=type_storage,style=input_field_style),
+#     #html.Button('Confirm', id='reference-taxa-button', n_clicks=0,style=button_style),
+#     html.Div(id='reference-taxa-output',style={'display':'inline-block'}),
+#     ]), None
+#     else:
+#         if info_current_file_store["taxa_start"]!=None:
+#             message=html.H5(f"Reference Taxa: {find_reference_taxa(info_current_file_store)}",style={"text-indent": '30px'})
+#             return None,message
+#         else:
+#             return None, html.H5("Reference Taxa: Error Enter Taxa interval",style={"text-indent": '30px'})
 
 @app.callback(
-    Output('select-separate-data', 'children'),
-    Output('separate-groups-info','children'),
-    [Input('check-separate-data', 'value')]
+    Output("info-current-file-store","data",allow_duplicate=True),
+    Output('select-ref-taxa', 'style'),
+    Output('reference-taxa-input', 'min'),
+    Output('reference-taxa-input', 'max'),
+    Output('reference-taxa-input', 'value'),
+    Output('taxa-reference-info','children',allow_duplicate=True),
+    [Input('check-ref-taxa', 'value')],
+    State("info-current-file-store","data"),prevent_initial_call='initial_duplicate'
 )
-def update_output_data(value):
-    global info_current_file
+def update_output_taxa(value,info_current_file_store):
     if len(value)!=0:
-        groups_info=[html.Div(id="first-group-info",children=[html.H5("First Group: ",style={"text-indent": '30px'})]),
-        html.Div(id="second-group-info",children=[html.H5("Second Group: ",style={"text-indent": '30px'})])]
-        pheno_select=html.Div(style={'display': 'inline-block','vertical-align': 'middle'},children=[
-          html.H5("Phenotype column ",style={"text-indent": '30px','display': 'inline-block'}),
-          dcc.Store(id='phenotype-column-status', storage_type=type_storage),
-    dcc.Input(id='phenotype-column-input',type='number',min=info_current_file['covar_start'],max=info_current_file['covar_end'],step=1,value=info_current_file['covar_start'],persistence=True,persistence_type=type_storage,style=input_field_number_style),
-    #dcc.Input(id='phenotype-column-input', type='text', placeholder='ex: 124',persistence=True,persistence_type=type_storage,style=input_field_style),
-    #html.Button('Confirm', id='phenotype-column-button', n_clicks=0,style=button_style),
-    html.Div(id='phenotype-column-output',style={'display': 'inline-block'}),
-    ])
-        return pheno_select,groups_info
+        min=info_current_file_store['taxa_start']
+        max=info_current_file_store['taxa_end']
+        value=info_current_file_store['taxa_end']
+        ref_taxa=find_reference_taxa(info_current_file_store,value)
+        message=html.H5(f"Reference Taxa: {ref_taxa}",style={"text-indent": '30px'})
+        return info_current_file_store,None,min,max,value,message
     else:
-        info_current_file['phenotype_column']=None
-        info_current_file['first_group']=None
-        info_current_file['second_group']=None
-        return None,None
+        message=None
+        if info_current_file_store["taxa_start"]!=None:
+            ref_taxa=find_reference_taxa(info_current_file_store)
+            message=html.H5(f"Reference Taxa: {ref_taxa}",style={"text-indent": '30px'})
+            info_current_file_store["reference_taxa"]=ref_taxa
+        else:
+            message=html.H5("Reference Taxa: Error Enter Taxa interval",style={"text-indent": '30px'})
+            info_current_file_store["reference_taxa"]=None
+        
+        return info_current_file_store,{'display':'none'},None,None,None,message
+    
+
+@app.callback(Output('info-current-file-store', 'data',allow_duplicate=True),
+    Output('select-separate-data', 'style'),
+    Output('phenotype-column-input', 'min'),
+    Output('phenotype-column-input', 'max'),
+    Output('phenotype-column-input', 'value'),
+    Output('separate-groups-info','style'),
+    Input('check-separate-data', 'value'),
+    State("info-current-file-store","data"),prevent_initial_call=True
+)
+def update_output_data(value,info_current_file_store):
+    if len(value)!=0:
+        min=info_current_file_store['covar_start']
+        max=info_current_file_store['covar_end']
+        value=info_current_file_store['covar_start']
+        #style={'display': 'inline-block','vertical-align': 'middle'}
+        style={'vertical-align': 'middle'}
+        return info_current_file_store,style,min,max,value,None
+    else:
+        info_current_file_store['phenotype_column']=None
+        info_current_file_store['first_group']=None
+        info_current_file_store['second_group']=None
+        return info_current_file_store,{'display':'none'},None,None,None,{'display':'none'}
+    
+# @app.callback(Output('info-current-file-store', 'data',allow_duplicate=True),
+#     Output('select-separate-data', 'children'),
+#     Output('separate-groups-info','children'),
+#     Input('check-separate-data', 'value'),
+#     State("info-current-file-store","data"),prevent_initial_call=True
+# )
+# def update_output_data(value,info_current_file_store):
+#     if len(value)!=0:
+#         groups_info=[html.Div(id="first-group-info",children=[html.H5("First Group: ",style={"text-indent": '30px'})]),
+#         html.Div(id="second-group-info",children=[html.H5("Second Group: ",style={"text-indent": '30px'})])]
+#         pheno_select=html.Div(style={'display': 'inline-block','vertical-align': 'middle'},children=[
+#           html.H5("Phenotype column ",style={"text-indent": '30px','display': 'inline-block'}),
+#           dcc.Store(id='phenotype-column-status', storage_type=type_storage),
+#     dcc.Input(id='phenotype-column-input',type='number',min=info_current_file_store['covar_start'],max=info_current_file_store['covar_end'],step=1,value=info_current_file_store['covar_start'],persistence=True,persistence_type=type_storage,style=input_field_number_style),
+#     #dcc.Input(id='phenotype-column-input', type='text', placeholder='ex: 124',persistence=True,persistence_type=type_storage,style=input_field_style),
+#     #html.Button('Confirm', id='phenotype-column-button', n_clicks=0,style=button_style),
+#     html.Div(id='phenotype-column-output',style={'display': 'inline-block'}),
+#     ])
+#         return info_current_file_store,pheno_select,groups_info
+#     else:
+#         info_current_file_store['phenotype_column']=None
+#         info_current_file_store['first_group']=None
+#         info_current_file_store['second_group']=None
+#         return info_current_file_store,None,None
 
 
 ###### Reference Taxa column #######
@@ -586,28 +666,30 @@ def on_click(value, data):
     return data
 
 # output the stored clicks in the table cell.
-@app.callback(Output("reference-taxa-output", 'children'),
+@app.callback(Output('info-current-file-store','data',allow_duplicate=True),
+        Output("reference-taxa-output", 'children'),
               Output("taxa-reference-info", 'children',allow_duplicate=True),
                 Input('reference-taxa-status', 'modified_timestamp'),
-                State('reference-taxa-status', 'data'),prevent_initial_call='initial_duplicate')
-def on_data(ts, data):
+                State('reference-taxa-status', 'data'),
+                State('info-current-file-store','data'),prevent_initial_call='initial_duplicate')
+def on_data(ts, data,info_current_file_store):
     if ts is None:
         raise PreventUpdate
 
     data = data or {}
 
-    print(data)
+    #print(data)
 
     if data.get('value',None)==None:
-        return None,None
+        return info_current_file_store,None,None
     else:
         if data["value"]=="":
-            name_reference_taxa=find_reference_taxa(info_current_file)
+            name_reference_taxa=find_reference_taxa(info_current_file_store)
+            info_current_file_store["reference_taxa"]=name_reference_taxa
         else:
-            reference_taxa=data["value"]
-            print("Par curioisté: ",find_reference_taxa(info_current_file))
-            name_reference_taxa=find_reference_taxa(info_current_file,reference_taxa)
-        return html.H5(f"Reference Taxa: {name_reference_taxa}",style={'display': 'inline-block'}),html.H5(f"Reference Taxa: {name_reference_taxa}",style={'text-indent': '30px'})
+            name_reference_taxa=find_reference_taxa(info_current_file_store,data["value"])
+            info_current_file_store["reference_taxa"]=name_reference_taxa
+        return info_current_file_store,html.H5(f"Reference Taxa: {name_reference_taxa}",style={'display': 'inline-block'}),html.H5(f"Reference Taxa: {name_reference_taxa}",style={'text-indent': '30px'})
   
 
 
@@ -634,43 +716,44 @@ def on_click(value, data):
     return data
 
 # output the stored clicks in the table cell.
-@app.callback(Output("phenotype-column-output", 'children'),
+@app.callback(Output("info-current-file-store","data",allow_duplicate=True),
+        Output("phenotype-column-output", 'children'),
               Output("first-group-info","children"),
               Output("second-group-info","children"),
                 Input('phenotype-column-status', 'modified_timestamp'),
-                State('phenotype-column-status', 'data'))
-def on_data(ts, data):
-    global info_current_file
+                State('phenotype-column-status', 'data'),
+                State("info-current-file-store","data"),prevent_initial_call=True)
+def on_data(ts, data,info_current_file_store):
     if ts is None:
         raise PreventUpdate
 
     data = data or {}
 
     if data.get('value',None)==None:
-        return [],[],[]
+        return info_current_file_store,[],[],[]
     else:
         if data["value"]=="":
             return "Error : The field cannot be empty."
         else:
-            if check_phenotype_column(info_current_file,data["value"]):
-                nb_first_group,nb_second_group=get_info_separate_groups(info_current_file,data["value"])
+            if check_phenotype_column(info_current_file_store,data["value"]):
+                nb_first_group,nb_second_group=get_info_separate_groups(info_current_file_store,data["value"])
                 validation_message=html.I(className="fas fa-check-circle", style={'color': 'green'})
                 first_group=html.H5(f"First Group: {nb_first_group}",style={"text-indent": '30px'})
                 second_group=html.H5(f"Second Group: {nb_second_group}",style={"text-indent": '30px'})
-                info_current_file['phenotype_column']=data["value"]
-                info_current_file['first_group']=nb_first_group
-                info_current_file['second_group']=nb_second_group
+                info_current_file_store['phenotype_column']=data["value"]
+                info_current_file_store['first_group']=nb_first_group
+                info_current_file_store['second_group']=nb_second_group
 
-                return validation_message,first_group,second_group
+                return info_current_file_store,validation_message,first_group,second_group
                     #return f"Valid interval : {start} - {end}"
             else:
                 first_group=html.H5("First Group: Error Phenotype Column isn't binary",style={"text-indent": '30px'})
                 second_group=html.H5("Second Group: Error Phenotype Column isn't binary",style={"text-indent": '30px'})
                 error_message=[html.I(className="fas fa-times-circle", style={'color': 'red'}),html.H5("Error : Column is not binary.",style={'display': 'inline-block'})]
-                info_current_file['phenotype_column']='error'
-                info_current_file['first_group']='error'
-                info_current_file['second_group']='error'
-                return error_message,first_group,second_group
+                info_current_file_store['phenotype_column']='error'
+                info_current_file_store['first_group']='error'
+                info_current_file_store['second_group']='error'
+                return info_current_file_store,error_message,first_group,second_group
   
 
 ###### Filters ######
@@ -721,7 +804,8 @@ def on_click(value, data):
 
 
 
-@app.callback(Output('select-filter-columns-zero', 'style'),
+@app.callback(Output("info-current-file-store","data",allow_duplicate=True),
+              Output('select-filter-columns-zero', 'style'),
               Output('select-filter-deviation-mean', 'style'),
               Output('filter-deviation-mean-output', 'children'),
               Output('filter-columns-zero-output', 'children'),
@@ -736,8 +820,8 @@ def on_click(value, data):
               Input("filter-columns-zero-status","modified_timestamp"),
               State('filter-deviation-mean-status', 'data'),
               State('filter-columns-zero-status', 'data'),
-              )
-def get_changes_filters(check_dev_mean,check_zeros,ts_dev_mean,ts_zeros,data_dev_mean,data_zeros):
+              State('info-current-file-store','data'),prevent_initial_call=True)
+def get_changes_filters(check_dev_mean,check_zeros,ts_dev_mean,ts_zeros,data_dev_mean,data_zeros,info_current_file_store):
 
     style_not_displayed={'display': 'none','vertical-align': 'middle'}
     style_displayed={'vertical-align': 'middle'}
@@ -752,45 +836,51 @@ def get_changes_filters(check_dev_mean,check_zeros,ts_dev_mean,ts_zeros,data_dev
         filter_dev_mean=data_dev_mean["value"]
     
     if filter_zero==None and filter_dev_mean==None:
-        return style_not_displayed,style_not_displayed,None,None,None,None,html.H5("No filter applied",style={"text-indent": '15px'}),None,1
+        info_current_file_store["filter_zeros"]=None
+        info_current_file_store["filter_dev_mean"]=None
+
+        #print("Info filter1: ",info_filter)
+
+        return info_current_file_store,style_not_displayed,style_not_displayed,None,None,None,None,html.H5("No filter applied",style={"text-indent": '15px'}),None,1
     elif filter_zero!=None and filter_dev_mean==None:
-        df_filtered=filter_percent_zeros(info_current_file,filter_zero)
-        info_current_file["df_taxa"]=df_filtered
-        info_current_file["filter_zeros"]=filter_zero
-        nb_taxa=info_current_file['taxa_end']-info_current_file['taxa_start']+1
-        info_zeros=html.H5(f"Filter with pourcent of zeros: {nb_taxa-df_filtered.shape[1]} taxa deleted",style={"text-indent": '15px'})
-        output_zeros=html.H5(f"{nb_taxa-df_filtered.shape[1]} taxa deleted",style={'display': 'inline-block'})
-        summary_filter=html.H5(f"Summary: {df_filtered.shape[1]} taxa remaining",style={'display': 'inline-block',"text-indent": '15px'})
-        return style_displayed,style_not_displayed,None,output_zeros,info_zeros,None,summary_filter,None,1
+        info_current_file_store["filter_zeros"]=filter_zero
+        info_current_file_store["filter_dev_mean"]=None
+        info_filter=get_df_taxa(info_current_file_store,"info") 
+
+        #print("Info filter2: ",info_filter)
+
+        info_zeros=html.H5(f"Filter with pourcent of zeros: {info_filter["zeros-deleted"]} taxa deleted",style={"text-indent": '15px'})
+        output_zeros=html.H5(f"{info_filter["zeros-deleted"]} taxa deleted",style={'display': 'inline-block'})
+        summary_filter=html.H5(f"Summary: {info_filter["remaining-taxa"]} taxa remaining",style={'display': 'inline-block',"text-indent": '15px'})
+        return info_current_file_store,style_displayed,style_not_displayed,None,output_zeros,info_zeros,None,summary_filter,None,1
     
     elif filter_zero==None and filter_dev_mean!=None:
-        info_current_file["df_taxa"]=get_df_file(info_current_file).iloc[:,info_current_file["taxa_start"]-1:info_current_file["taxa_end"]]
-        nb_taxa=info_current_file['taxa_end']-info_current_file['taxa_start']+1
-        df_filtered=filter_deviation_mean(info_current_file,filter_dev_mean)
-        info_current_file["df_taxa"]=df_filtered
-        output_dev_mean=html.H5(f"{nb_taxa-df_filtered.shape[1]} taxa deleted",style={'display': 'inline-block'})
-        info_dev_mean=html.H5(f"Filter with deviation/mean ratio: {nb_taxa-df_filtered.shape[1]} taxa deleted",style={"text-indent": '15px'})
-        summary_filter=html.H5(f"Summary: {df_filtered.shape[1]} taxa remaining",style={'display': 'inline-block',"text-indent": '15px'})
+        info_current_file_store["filter_zeros"]=filter_zero
+        info_current_file_store["filter_dev_mean"]=filter_dev_mean
+        info_filter=get_df_taxa(info_current_file_store,"info")
 
-        return style_not_displayed,style_displayed,output_dev_mean,None,None,info_dev_mean,summary_filter,info_current_file["df_taxa"].shape[1],min(filter_dev_mean,df_filtered.shape[1])
+        #print("Info filter3: ",info_filter)
+
+        output_dev_mean=html.H5(f"{info_filter["dev-mean-deleted"]} taxa deleted",style={'display': 'inline-block'})
+        info_dev_mean=html.H5(f"Filter with deviation/mean ratio: {info_filter["dev-mean-deleted"]} taxa deleted",style={"text-indent": '15px'})
+        summary_filter=html.H5(f"Summary: {info_filter["remaining-taxa"]} taxa remaining",style={'display': 'inline-block',"text-indent": '15px'})
+
+        return info_current_file_store,style_not_displayed,style_displayed,output_dev_mean,None,None,info_dev_mean,summary_filter,info_filter["taxa-init"]-info_filter["dev-mean-deleted"],min(filter_dev_mean,info_filter["taxa-init"]-info_filter["dev-mean-deleted"])
     else:
         #Filter on zeros percent and dev mean activated at the same time
-        df_filtered=filter_percent_zeros(info_current_file,filter_zero)
-        nb_taxa_init=info_current_file['taxa_end']-info_current_file['taxa_start']+1
-        info_current_file["df_taxa"]=df_filtered
-        nb_taxa_after_zeros=info_current_file["df_taxa"].shape[1]
-        info_zeros=html.H5(f"Filter with pourcent of zeros: {nb_taxa_init-nb_taxa_after_zeros} taxa deleted",style={"text-indent": '15px'})
-        output_zeros=html.H5(f"{nb_taxa_init-nb_taxa_after_zeros} taxa deleted",style={'display': 'inline-block'})
 
-        df_filtered=filter_deviation_mean(info_current_file,filter_dev_mean)
-        info_current_file["df_taxa"]=df_filtered
-        output_dev_mean=html.H5(f"{nb_taxa_after_zeros-df_filtered.shape[1]} taxa deleted",style={'display': 'inline-block'})
-        info_dev_mean=html.H5(f"Filter with deviation/mean ratio: {nb_taxa_after_zeros-df_filtered.shape[1]} taxa deleted",style={"text-indent": '15px'})
-        summary_filter=html.H5(f"Summary: {df_filtered.shape[1]} taxa remaining",style={'display': 'inline-block',"text-indent": '15px'})
+        info_current_file_store["filter_zeros"]=filter_zero
+        info_current_file_store["filter_dev_mean"]=filter_dev_mean
+        info_filter=get_df_taxa(info_current_file_store,"info")
+
+        #print("Info filter4: ",info_filter)
+
+        info_zeros=html.H5(f"Filter with pourcent of zeros: {info_filter["zeros-deleted"]} taxa deleted",style={"text-indent": '15px'})
+        output_zeros=html.H5(f"{info_filter["zeros-deleted"]} taxa deleted",style={'display': 'inline-block'})
+        output_dev_mean=html.H5(f"{info_filter["dev-mean-deleted"]} taxa deleted",style={'display': 'inline-block'})
+        info_dev_mean=html.H5(f"Filter with deviation/mean ratio: {info_filter["dev-mean-deleted"]} taxa deleted",style={"text-indent": '15px'})
+        summary_filter=html.H5(f"Summary: {info_filter["remaining-taxa"]} taxa remaining",style={'display': 'inline-block',"text-indent": '15px'})
         
-        return style_displayed,style_displayed,output_dev_mean,output_zeros,info_zeros,info_dev_mean,summary_filter,nb_taxa_after_zeros,min(filter_dev_mean,nb_taxa_after_zeros)
-
-    # if ts_dev_mean is None:
-    #         raise PreventUpdate
+        return info_current_file_store,style_displayed,style_displayed,output_dev_mean,output_zeros,info_zeros,info_dev_mean,summary_filter,info_filter["taxa-init"]-info_filter["zeros-deleted"],min(filter_dev_mean,info_filter["taxa-init"]-info_filter["zeros-deleted"])
 
 
