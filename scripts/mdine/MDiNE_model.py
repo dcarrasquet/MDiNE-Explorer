@@ -20,13 +20,6 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 import sys
-
-
-
-# from mdine.extract_data_files import get_separate_data,get_df_covariates,get_df_taxa
-# from mdine.verify_mdine_model import generate_counts_data_Multinomial,generate_counts_data_ZINB
-# from extract_data_files import get_separate_data,get_df_covariates,get_df_taxa
-# from verify_mdine_model import generate_counts_data_Multinomial,generate_counts_data_ZINB
     
 try:
     # First Try
@@ -159,18 +152,37 @@ def simulation_data_R(filename):
             run_model(covariates_0,counts_0,model_parameters,folder_simulation+f"test_{i}_group_0")
             run_model(covariates_1,counts_1,model_parameters,folder_simulation+f"test_{i}_group_1")
 
-            
-
-def terminal_run_model():
-    covariate_matrix_data=sys.argv[1]
-    counts_matrix_data=sys.argv[2]
-    simulation=sys.argv[3]
-    folder=sys.argv[4]
-    run_model(covariate_matrix_data,counts_matrix_data,simulation,folder)
-
-
+def debug_MDiNE_model():
+    parameters_model={
+        'beta_matrix':{
+            'apriori':'Normal',
+            'parameters':{
+                'alpha':1,
+                'beta':1
+            }
+        },
+        'precision_matrix':{
+            'apriori':'Lasso',
+            'parameters':{
+                'lambda_init':1
+            }
+        }
+    }
+    file_path="data/crohns-numeric-tsv.tsv"
+    df=pd.read_table(file_path,sep='\t')
+    start_cov=2
+    end_cov=5
+    start_taxa=6
+    end_taxa=11
+    df_covariates=df.iloc[:,start_cov-1:end_cov]
+    df_taxa=df.iloc[:,start_taxa-1:end_taxa]
+    run_model(df_covariates,df_taxa,parameters_model,"data/debug_MDiNE")
 
 def run_model(covariate_matrix_data,counts_matrix_data,simulation,folder):
+
+    # print("Covariates ",covariate_matrix_data)
+    # print("Txaa: ",counts_matrix_data)
+    # print("Simulation: ",simulation)
 
     beta_matrix_choice=simulation["beta_matrix"]["apriori"]
     parameters_beta_matrix=simulation["beta_matrix"]["parameters"]
@@ -179,7 +191,6 @@ def run_model(covariate_matrix_data,counts_matrix_data,simulation,folder):
     parameters_precision_matrix=simulation["precision_matrix"]["parameters"]
 
     if not os.path.exists(folder):
-        # Créer le sous-dossier s'il n'existe pas
         os.makedirs(folder)
 
     with pm.Model() as mdine_model:
@@ -191,13 +202,12 @@ def run_model(covariate_matrix_data,counts_matrix_data,simulation,folder):
 
         ## Matrice Beta
 
-        #beta_matrix_choice="Normal"
+        if beta_matrix_choice=="Normal":
+            beta_matrix=pm.Normal("beta_matrix",mu=0,sigma=1000,shape=(k_covariates,j_taxa))
 
-        if beta_matrix_choice=="Ridge":
+        elif beta_matrix_choice=="Ridge":
             
             lambda_ridge=pm.Gamma("lambda_brige",alpha=parameters_beta_matrix["alpha"],beta=parameters_beta_matrix["beta"],shape=(k_covariates,j_taxa))
-            #lambda_ridge=pm.Gamma("lambda_brige",alpha=1,beta=1,shape=(k_covariates,j_taxa))
-
             beta_matrix=pm.Normal("beta_matrix",mu=0,tau=lambda_ridge,shape=(k_covariates,j_taxa))
 
         elif beta_matrix_choice=="Lasso":
@@ -228,44 +238,35 @@ def run_model(covariate_matrix_data,counts_matrix_data,simulation,folder):
             proba_gamma=pm.Beta("pi_gamma",alpha=alpha_gamma,beta=beta_gamma,shape=(k_covariates,j_taxa))
             gamma_matrix=pm.Bernoulli("gamma",p=proba_gamma,shape=(k_covariates,j_taxa))
 
-            # Générer une matrice de nombres aléatoires entre 0.1 et 1 avec deux décimales
-            #tau_matrix = np.random.uniform(low=0.01, high=0.1, size=(k_covariates, j_taxa)).round(2)
             tau=parameters_beta_matrix["tau"]
-            #print(tau_matrix)
-
-            # Générer une matrice d'entiers aléatoires entre 10 et 100
-            #c_matrix = np.random.uniform(low=0.1, high=1, size=(k_covariates, j_taxa)).round(2)
+            
             c=parameters_beta_matrix["c"]
-            #print(c_matrix)
 
             # Hadamard product between two tensors: A*B
-            #(pymc.math.ones(k_covariates, j_taxa)-gamma_matrix)*pm.Normal.dist(mu=0, sigma=tau_matrix, shape=(k_covariates, j_taxa))+gamma_matrix*pm.Normal.dist(mu=0, sigma=tau_matrix*c_matrix, shape=(k_covariates, j_taxa))
             beta_matrix=pm.Deterministic("beta_matrix",(pymc.math.ones((k_covariates, j_taxa))-gamma_matrix)*pm.Normal("Beta_Spike",mu=0, sigma=tau, shape=(k_covariates, j_taxa))+gamma_matrix*pm.Normal("Beta_Slab",mu=0, sigma=tau*c, shape=(k_covariates, j_taxa)))
 
         else:
-            print("The choice for the Beta matrix is incorrect")
+            raise ValueError(f"Invalid precision_matrix_choice: {precision_matrix_choice}")
 
         ## Precision Matrix
-        #precision_matrix_choice="invwishart_penalized"
 
         if precision_matrix_choice=="Lasso":
 
             lambda_init=parameters_precision_matrix["lambda_init"]
-            #lambda_init=10
-            lambda_mdine=pm.Exponential("lambda_mdine",lambda_init)
+            lambda_mdine=pm.Exponential("lambda_mdine",1/lambda_init) 
 
-            # Construction des coefficients diagonaux et extra-diagonaux
+            #Construction of the diagonal and off-diagonal coefficients.
 
             precision_matrix_coef_diag=pm.Exponential("precision_matrix_coef_diag",lam=lambda_mdine/2,shape=(j_taxa,))
-            precision_matrix_coef_off_diag=pm.Laplace("precision_matrix_coef_off_diag",mu=0,b=lambda_mdine,shape=(j_taxa*(j_taxa-1)/2,))
+            precision_matrix_coef_off_diag=pm.Laplace("precision_matrix_coef_off_diag",mu=0,b=1/lambda_mdine,shape=(j_taxa*(j_taxa-1)/2,))
 
-            # Assemblage de la matrice de précision à partir des coefficients ci-dessus
             precision_matrix=pm.Deterministic("precision_matrix",make_precision_matrix(precision_matrix_coef_diag,precision_matrix_coef_off_diag,j_taxa))
 
         elif precision_matrix_choice=="Invwishart":
             scale_matrix=np.eye(j_taxa)
+            df=j_taxa+2 #Degrees of freedom
             
-            covariance_matrix=pm.WishartBartlett("covariance_matrix",scale_matrix,j_taxa+2)
+            covariance_matrix=pm.WishartBartlett("covariance_matrix",scale_matrix,df)
             precision_matrix=pm.Deterministic("precision_matrix",matrix_inverse(covariance_matrix))
             
 
@@ -278,7 +279,6 @@ def run_model(covariate_matrix_data,counts_matrix_data,simulation,folder):
             #Scale Matrix construction for Wishart distribution
             transformed_coefs=[1/(i**2) for i in coefs_user]
             coef_diag_scale_matrix=pm.InverseGamma("coef_penalisation",1/2,transformed_coefs)
-            #inv_coef_diag_scale_matrix=pytensor.tensor.as_tensor_variable([1/i for i in coef_diag_scale_matrix])
             inv_coef_diag_scale_matrix=pt.as_tensor_variable([1/i for i in coef_diag_scale_matrix])
             scale_matrix=2*df*pytensor.tensor.diag(inv_coef_diag_scale_matrix)
 
@@ -311,145 +311,37 @@ def run_model(covariate_matrix_data,counts_matrix_data,simulation,folder):
             precision_matrix=pm.Deterministic("precision_matrix",matrix_inverse(covariance_matrix))
 
         else:
-            print("The choice for the precision matrix is incorrect")
+            raise ValueError(f"Invalid precision_matrix_choice: {precision_matrix_choice}")
 
 
     
-        ## Matrice de covariables, permet de l'afficher sur le graphique
+        ## Covariate matrix, allows it to be displayed on the graph.
 
         covariate_matrix=pm.Deterministic("X_covariates",pytensor.tensor.as_tensor_variable(covariate_matrix_data))
 
         product_X_Beta=pm.Deterministic("Product_X_Beta",covariate_matrix@beta_matrix)
 
-        # Matrice W, loi normale
-
+        # Matrix W, Normal distribution
         w_matrix=pm.MvNormal("w_matrix",mu=product_X_Beta,tau=precision_matrix)
-        #w_matrix=pm.MvNormal("w_matrix",mu=product_X_Beta,cov=precision_matrix)
         
-
-
-        #Matrice de proportions, Deterministic avec Softmax
+        #Proportions Matrix, Deterministic with Softmax
         proportions_matrix=pm.Deterministic("proportions_matrix",pymc.math.softmax(pymc.math.concatenate([w_matrix,pt.zeros(shape=(n_individuals,1))],axis=1),axis=1))
-
-        #mdine_model.debug()
-
-        # liste_sum_counts=[]
-        # for i in range(n_individuals):
-        #     liste_sum_counts.append(sum(counts_matrix_data[i]))
 
         liste_sum_counts = counts_matrix_data.sum(axis=1).tolist()
 
-        ###Matrice des comptes estimées, loi multinomiale
+        ## Estimated counts matrix, Multinomial distribution
 
         counts_matrix=pm.Multinomial("counts_matrix",n=liste_sum_counts,p=proportions_matrix,observed=counts_matrix_data)
-
-
-    #graph=pm.model_to_graphviz(mdine_model) # <class 'graphviz.graphs.Digraph'>
-
-    
-    #graph.render(folder+"model_graph",format="png")
 
     with mdine_model:
         #mdine_model.debug()
         idata = pm.sample(1000) ## 10000 normally
-        #print("Je vais faire un fit")
-        # idata=None
-        # mean_field=pm.fit()
-        # print("Mean field", mean_field)
-
-
-
-    # Beta_matrix=idata.posterior.beta_matrix.values[3][-1]
-
-    # print("Beta Matrix:\n")
-    # print(Beta_matrix)
-
-    # with mdine_model:
-    #     ppc=pm.sample_posterior_predictive(idata,extend_inferencedata=True)
-
-    # az.plot_forest(idata, var_names=["beta_matrix"], hdi_prob=0.80)
-    # az.plot_forest(idata, var_names=["precision_matrix"], hdi_prob=0.80)
-
-    # az.plot_ppc(ppc,kind="kde")
-    # plt.plot()
-    # plt.show()
-
-    #### Parties pour sauvegarder toutes les figures
-
-    save_figures=False
-
-    if save_figures==True:
-
-        with mdine_model:
-            ppc=pm.sample_posterior_predictive(idata,extend_inferencedata=True)
-
-        az.plot_ppc(ppc,kind="kde")
-        plt.savefig(folder+"ppc_kde.png")
-
-        az.plot_ppc(ppc,kind="cumulative")
-        plt.savefig(folder+"ppc_cumulative.png")
-        #plt.plot()
-        #print(az.summary(idata, kind="stats"))
-
-        #print(idata.sample_stats)
-        idata.sample_stats["tree_depth"].plot(col="chain", ls="none", marker=".", alpha=0.3)
-        plt.savefig(folder+"sample_stats.png")
-        
-        az.plot_energy(idata, figsize=(6, 4))
-        plt.savefig(folder+"energy.png")
-
-        az.plot_posterior(idata, group="sample_stats", var_names="acceptance_rate", hdi_prob="hide", kind="hist")
-        plt.savefig(folder+"posterior.png")
-
-
-        #print("Divergence? :",idata.sample_stats["diverging"].sum())
-        az.plot_trace(idata, var_names=["beta_matrix"])
-        plt.savefig(folder+"beta_trace.png")
-        #az.plot_trace(idata, var_names=["beta_matrix","tau","lambda_horseshoe"])
-        #az.plot_trace(idata, var_names=["beta_matrix","pi_gamma","gamma"])
-    
-        #plt.show(block=False)
-
-        az.plot_forest(idata, var_names=["beta_matrix"], hdi_prob=0.80)
-        ax = plt.gca()
-
-        # Tracer une ligne verticale en rouge pointillée à x=0
-        #plt.plot(beta, np.arange(len(beta)), 'rx', label='Vraies données')
-        ax.axvline(x=0, color='red', linestyle='--')
-        plt.savefig(folder+"beta_forest.png")
-
-        az.plot_trace(idata, var_names=["precision_matrix"])
-        plt.savefig(folder+"precision_trace.png")
-        #az.plot_trace(idata, var_names=["beta_matrix","tau","lambda_horseshoe"])
-        #az.plot_trace(idata, var_names=["beta_matrix","pi_gamma","gamma"])
-    
-        #plt.show(block=False)
-
-        az.plot_forest(idata, var_names=["precision_matrix"], hdi_prob=0.80)
-        ax = plt.gca()
-
-        # Tracer une ligne verticale en rouge pointillée à x=0
-        #plt.plot(beta, np.arange(len(beta)), 'rx', label='Vraies données')
-        ax.axvline(x=0, color='red', linestyle='--')
-        plt.savefig(folder+"precision_forest.png")
-
-	    #plt.show()
-
-    # with open(f"results_simulations/{simulation_name}.pkl", "wb") as f: #Potentialy modify the name of the file depending on the parameters of the simulation
-    #     pickle.dump(idata, f)
 
     if idata!=None:
+        print("Folder: ",folder)
         with open(folder+"idata.pkl", "wb") as f: #Potentialy modify the name of the file depending on the parameters of the simulation
             pickle.dump(idata, f)
-    
-    # if mean_field!=None:
-    #     with open(folder+"mean_field.pkl", "wb") as f: #Potentialy modify the name of the file depending on the parameters of the simulation
-    #         pickle.dump(mean_field, f)
-
-    
-    # axes_arr = az.plot_trace(idata)
-    # plt.draw()
-    # plt.show()
+            print("Fichier écrit avec succès!")
 
 def make_precision_matrix(coef_diag,coef_off_diag,j_taxa):
 
@@ -530,62 +422,30 @@ def estimate_lambda_init(covariate_matrix_data,counts_matrix_data):
 
 def run_model_terminal():
 
-
-    info_current_file_store_str=sys.argv[1] ## 2 choices: one_group, two_groups
-
-    info_current_file_store=json.loads(info_current_file_store_str)
-
-    #print("Info_current_file_store: ",info_current_file_store)
+    info_current_file_store=json.loads(sys.argv[1])
 
     if info_current_file_store["phenotype_column"]==None:
         #Only one group
-        #print("Choice one grooooop")
+        print("Start Inference")  
         df_covariates=get_df_covariates(info_current_file_store)
         df_taxa=get_df_taxa(info_current_file_store,"df_taxa")
         run_model(df_covariates,df_taxa,info_current_file_store["parameters_model"],info_current_file_store["session_folder"])
 
     elif info_current_file_store["phenotype_column"]!=None:
-        #print("Two groups!!!")
+
         [df_covariates_1,df_taxa_1],[df_covariates_2,df_taxa_2]=get_separate_data(info_current_file_store)
         path_first_group=os.path.join(info_current_file_store["session_folder"],"first_group/")
         path_second_group=os.path.join(info_current_file_store["session_folder"],"second_group/")
-        #print("First model started")
+
+        print("Start first inference")
         run_model(df_covariates_1,df_taxa_1,info_current_file_store["parameters_model"],path_first_group)
-        #print("Second model started")
+
+        print("Start second inference")
         run_model(df_covariates_2,df_taxa_2,info_current_file_store["parameters_model"],path_second_group)
-    else:
-        print("Argument not valid")
 
 if __name__=="__main__":
     run_model_terminal()
-
-
-    #run_simulation("test_mdine/examples_json_simulation/ridge_lasso_5.json")
-    #run_simulation("test_mdine/examples_json_simulation/horseshoe_lasso.json")
-
-    #test_wishart(3)
     
-    
-    # filename="data/crohns.csv"
-    # (covariate_matrix_data,counts_matrix_data,Z_vector)=get_data(filename)
-    # first_group,second_group=separate_data_in_two_groups(covariate_matrix_data,counts_matrix_data,Z_vector)
-
-    #beta_matrix_choice="Ridge" #Spike_and_slab Normal Lasso Horseshoe
-    #precision_matrix_choice="exp_Laplace" #exp_Laplace ou invwishart ou invwishart_penalized
-    # stringenplus="_Lambda2"
-
-    # simulation_name_0="simulation_group_0_"+beta_matrix_choice+"_"+precision_matrix_choice+stringenplus
-    # simulation_name_1="simulation_group_1_"+beta_matrix_choice+"_"+precision_matrix_choice
-
-    # #estimate_lambda_init(covariate_matrix_data,counts_matrix_data)
-
-    #simulation_name="simulation_data_generated_"+beta_matrix_choice+"_"+precision_matrix_choice
-    # run_model(first_group[0],first_group[1],beta_matrix_choice,precision_matrix_choice,simulation_name_0)
-    # #run_model(second_group[0],second_group[1],beta_matrix_choice,precision_matrix_choice,simulation_name_1)
-    # Sauvegarder les variables dans un fichier
-    #print(generate_data_mdine())
-    #(X_matrix,counts_matrix)=generate_data_mdine()
-    #run_model(X_matrix,counts_matrix,beta_matrix_choice,precision_matrix_choice,simulation_name)
 
 
     

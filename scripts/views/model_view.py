@@ -1,10 +1,11 @@
 import dash
 from dash import dcc, html,callback_context
 from dash.dependencies import Input, Output, State
-import plotly.express as px
+import dash_bootstrap_components as dbc
+#import plotly.express as px
 import os
 import re
-import base64
+#import base64
 from dash.exceptions import PreventUpdate
 import time
 import queue
@@ -13,8 +14,11 @@ import sys
 import json
 
 import threading
-import io
-import contextlib
+import subprocess
+import pexpect
+import shlex
+# import io
+# import contextlib
 
 from maindash import app,type_storage #info_current_file,
 
@@ -22,7 +26,6 @@ from maindash import app,type_storage #info_current_file,
 # from mdine.extract_data_files import get_separate_data
 
 model_thread = None
-thread_finished = threading.Event()
 
 button_hover_style = {
     'background': '#4A90E2'
@@ -72,10 +75,12 @@ input_field_number_style = {
 
 def layout_model():
     return html.Div([
-            html.H3('Model Page'),
-            html.Div(style={'width': '40%', 'display': 'inline-block', 'verticalAlign': 'top','clear': 'both', 'borderRight': '3px solid #ccc'}, children=[
+            #html.H3('Model Page'),
+            html.Div(style={'width': '30%', 'display': 'inline-block', 'verticalAlign': 'top','clear': 'both'}, children=[
 
-                #dcc.Store(id='details-state', storage_type=type_storage),
+                dcc.Store(id='process-pid-store', storage_type=type_storage,data=None),
+                dcc.Store(id='progressbar-info', storage_type=type_storage),
+
                 html.Details([
                     html.Summary("Advanced model settings"),
                     html.Div([
@@ -144,18 +149,14 @@ def layout_model():
                 dcc.Store(id='run-model-status', storage_type=type_storage),
                 html.Div(id="run-model-output"),
                 html.Div(id="output-area"),
-
-
-
-
+                html.Progress(id="progress-bar", value="0", max="100"),
 
 
             ]),
-            html.Div(style={'width': '60%', 'display': 'inline-block', 'verticalAlign': 'top'}, children=[
+            html.Div(style={'width': '70%', 'display': 'inline-block', 'verticalAlign': 'top','borderLeft': '3px solid #ccc'}, children=[
 
-
-                html.H3('Partie Droite'),
-                html.P('''The MDiNE model is a bayesian hierarchical model.
+                html.Div(style={'margin-left':'10px','text-indent':'15px'},children=[
+                    html.P('''The MDiNE model is a bayesian hierarchical model.
                 To estimate co-occurrence networks, we need to put some priors  
                 over two parameters, the beta Matrix and the precision matrix.
                 '''),
@@ -210,6 +211,10 @@ def layout_model():
                             \beta_{j} &\sim (1-\gamma_{j})\mathcal{N}(0,\tau)+\mathcal{N}(0,\tau c)
                             \end{aligned}
                              $$''', mathjax=True),
+
+                ]),
+                #html.H3('Partie Droite'),
+                
 
                 
                 
@@ -345,55 +350,38 @@ def on_data(ts, data):
         else:
             return "Error"
 
-output_queue = queue.Queue() 
-def read_output(fd):
-    buffer = b''
-    #for _ in range(20):
-    while True:
-        try:
-            chunk = os.read(fd, 1024)
-            #print("Chunk reussi")
-            #print("Chunk: ",chunk)
-        except OSError:
-            break
-        buffer += chunk
-        #buffer = chunk
-        lines = buffer.splitlines()
-        #print("Lines: ",lines)
-        for line in lines[:-1]:
-            output_queue.put(line.decode().strip())
-        buffer = lines[-1]
-        clean_buffer = remove_ansi_escape_sequences(buffer.decode(errors='replace').strip())
-        #print("Buffer: ",buffer)
-        output_queue.put(clean_buffer)
-        #print("Output buffer:",clean_buffer)
-    if buffer:
-        #print("Je suis rentre pas icii")
-        cleaned_buffer = remove_ansi_escape_sequences(buffer.decode(errors='replace').strip())
-        output_queue.put(cleaned_buffer)
+# def execute_model(info_current_file_store):
+#     pid, fd = pty.fork()
+#     print("PID:",pid)
+#     print("Execute model pid",os.getpid())
+#     print("Je passe pas mal de fois ici")
+#     if pid == 0:
 
-def remove_ansi_escape_sequences(text):
-    ansi_escape = re.compile(r'\x1B[@-_][0-?]*[ -/]*[@-~]')
-    return ansi_escape.sub('', text)
+#         print("Execute model inside pid",os.getpid())
 
-def execute_model(info_current_file_store):
-    global thread_finished
-    pid, fd = pty.fork()
-    if pid == 0:
-        # Processus enfant : exécute le script long_task_script.py
-        #os.chdir(current_working_directory)  # Changer le répertoire de travail
-        #os.execvp("pwd", ["pwd"])
+#         info_current_file_store_str=json.dumps(info_current_file_store)
+#         #cmd=[sys.executable, 'scripts/mdine/MDiNE_model.py',info_current_file_store_str]
+#         cmd=f"python scripts/mdine/MDiNE_model.py {info_current_file_store}"
+#         process = pexpect.spawn(cmd, timeout=None, encoding='utf-8')
 
-        info_current_file_store_str=json.dumps(info_current_file_store)
+#         while True:
+#             try:
+#                 line = process.readline().strip()
+#                 if not line:
+#                     break
+#                 print(f"Sortie du processus : {line}")
+#             except pexpect.EOF:
+#                 break
         
-        os.execvp(sys.executable, [sys.executable, 'scripts/mdine/MDiNE_model.py',info_current_file_store_str])
-    else:
-        # Processus parent : lit la sortie du processus enfant
-        try:
-            read_output(fd)
-        finally:
-            os.waitpid(pid, 0)  # Attend la fin du processus enfant
-            thread_finished.set()  # Signale que le thread est terminé
+#         #os.execvp(sys.executable, [sys.executable, 'scripts/mdine/MDiNE_model.py',info_current_file_store_str])
+#     else:
+#         # Processus parent : lit la sortie du processus enfant
+#         try:
+#             read_output(fd)
+#         finally:
+#             os.waitpid(pid, 0)  # Attend la fin du processus enfant
+#     print("On sait jamais je peux passer par la")
+
 
 # add a click to the appropriate store.
 @app.callback(Output('run-model-status', 'data'),
@@ -422,13 +410,15 @@ def on_click(n_clicks,data):
               Output("output-area","children"),
               Output("run-model-button",'disabled'),
               Output("run-model-button","title"),
+              Output("process-pid-store",'data'),
+              Output("progress-bar","value"),
             Input('run-model-status', 'modified_timestamp'),
             Input('interval-component', 'n_intervals'),
             State('run-model-status','data'),
-            State('info-current-file-store','data'),prevent_initial_call=True)
-def on_data(ts,n_intervals,data,info_current_file_store):
-
-    global model_thread,thread_finished
+            State('info-current-file-store','data'),
+            State('process-pid-store','data'),
+            State("progress-bar","value"),prevent_initial_call=True)
+def on_data(ts,n_intervals,data,info_current_file_store,process_pid,progress_value):
 
     if ts is None:
         raise PreventUpdate
@@ -439,10 +429,10 @@ def on_data(ts,n_intervals,data,info_current_file_store):
 
     if data.get('run_model',False)==False:
         if info_current_file_store["reference_taxa"]!=None or info_current_file_store["covar_end"]!=None:
-            return info_current_file_store,html.H5("Fonction pas encore lancée"),html.H5("Truc pas encore lancé"),False,None
+            return info_current_file_store,html.H5("Fonction pas encore lancée"),html.H5("Truc pas encore lancé"),False,None,process_pid,progress_value
         else:
             title="At least one error in the data section, please check the errors."
-            return info_current_file_store,html.H5("Fonction pas encore lancée"),html.H5("Truc pas encore lancé"),True,title
+            return info_current_file_store,html.H5("Fonction pas encore lancée"),html.H5("Truc pas encore lancé"),True,title,process_pid,progress_value
     
     ctx = dash.callback_context
 
@@ -457,20 +447,36 @@ def on_data(ts,n_intervals,data,info_current_file_store):
         # 'Run Model button was clicked'
         #print("Avant le thread")
         title="You cannot run the model twice. If you want to run another simulation, open a new window. "
-        model_thread=threading.Thread(target=execute_model,args=(info_current_file_store,))
-        model_thread.start()
-        #print("Après le lancement du thread")
-        #print("Thread alive: ",model_thread.is_alive())
+        
+        master_fd, slave_fd = pty.openpty()
+        cmd=[sys.executable, 'scripts/mdine/MDiNE_model.py',json.dumps(info_current_file_store)]
+
+        process = subprocess.Popen(cmd, stdin=slave_fd, stdout=slave_fd, stderr=slave_fd,text=True, close_fds=True)
+        
+        os.close(slave_fd)
+        threading.Thread(target=write_output_to_file, args=(master_fd,os.path.join(info_current_file_store["session_folder"],"output_model.json"))).start()
+        #info = os.fstat(master_fd)
+        # Utilisez psutil pour obtenir le PID du processus associé
+        # print("PID Info: ",info)
+        # # while True:
+        # #     read_output(master_fd)
+        # print("Parent PID ",os.getpid())
+        # print("Pid process:",process.pid)
         info_current_file_store["status-run-model"]="in-progress"
           
         
-        return info_current_file_store,None, None,True,title
+        return info_current_file_store,None, None,True,title,process.pid,progress_value
     elif trigger == 'interval-component':
         title="You cannot run the model twice. If you want to run another simulation, open a new window. "
         #'Interval component was triggered'
         last_output = ''
-        while not output_queue.empty():
-            last_output = output_queue.get()
+        
+        json_path=os.path.join(info_current_file_store["session_folder"],"output_model.json")
+        data = read_json_file(json_path)
+        percentage = data.get('percentage', 0)
+        chains = data.get('chains', 'N/A')
+        divergences = data.get('divergences', 'N/A')
+        time_remaining = data.get('time', 'N/A')
         
         if check_run_finish(info_current_file_store):
             #print("Le thread est terminé.")
@@ -479,17 +485,48 @@ def on_data(ts,n_intervals,data,info_current_file_store):
         # else:
         #     print("Le thread est toujours en cours d'exécution...")
 
-        return info_current_file_store,html.H5("Fonction lancée!"),last_output,True,title
+        return info_current_file_store,html.H5("Inference started!"),last_output,True,title,process_pid,str(percentage)
     else:
-        return info_current_file_store,None,None,True,None
+        return info_current_file_store,None,None,True,None,process_pid,progress_value
     
+def read_json_file(file_path):
+    try:
+        with open(file_path, 'r') as file:
+            data=json.load(file)
+        if data!=None:
+            return data
+        else:
+            return {}
+    except:
+        return {}
+    
+def write_output_to_file(fd,json_filename):
+            with os.fdopen(fd, 'r') as output:
+                for line in output:
+                    data=extract_info(line)
+                    with open(json_filename, 'w') as file:
+                        json.dump(data, file, indent=4)
+
+def extract_info(output):
+    print("Output: ",output)
+    match = re.search(
+        r"Sampling (\d+) chains, (\d+) divergences.*?(\d+)%.*?(\d+:\d+:\d+)",
+        output
+    )
+    if match:
+        return {
+            "chains": int(match.group(1)),
+            "divergences": int(match.group(2)),
+            "percentage": int(match.group(3)),
+            "time": match.group(4)
+        }
+    return None
 
 def check_run_finish(info_current_file_store):
     if info_current_file_store["second_group"]!=None:
         file_path=os.path.join(info_current_file_store["session_folder"],"second_group","idata.pkl")
     else:
         file_path=os.path.join(info_current_file_store["session_folder"],"idata.pkl")
-    #print("Exist file: ",os.path.exists(file_path))
     return os.path.exists(file_path)
 
 @app.callback(

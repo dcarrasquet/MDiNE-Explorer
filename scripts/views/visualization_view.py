@@ -110,7 +110,7 @@ input_field_label_style = {
 
 def layout_visualization():
     return html.Div([
-            html.H3('Visualization Page'),
+            #html.H3('Visualization Page'),
             dcc.Store(id='legend-store', data=[],storage_type=type_storage),
             dcc.Store(id='tab-status', storage_type=type_storage),
             dcc.Tabs(id="subtabs", value='subtab-cooccurrence',style={'margin-bottom': '20px','display':'none'},persistence=True,persistence_type=type_storage, children=[
@@ -160,7 +160,7 @@ def layout_co_occurence_networks(legend_store,info_current_file_store):
     if info_current_file_store["phenotype_column"]==None:
         switch_networks_diff=html.Div()
         file_idata=os.path.join(info_current_file_store["session_folder"],"idata.pkl")
-        df_taxa=get_df_taxa(info_current_file_store)
+        df_taxa=get_df_taxa(info_current_file_store,"df_taxa")
     else:
         switch_networks_diff=dcc.RadioItems(
             id='checklist-networks',
@@ -311,7 +311,7 @@ def update_graph(credibility, edges_width, nodes_size,font_size,children,legend_
     if specific_graph==None:
         file_idata=os.path.join(info_current_file_store["session_folder"],"idata.pkl")
 
-        df_taxa=get_df_taxa(info_current_file_store)
+        df_taxa=get_df_taxa(info_current_file_store,"df_taxa")
 
         with open(file_idata, "rb") as f:
             idata = pickle.load(f)

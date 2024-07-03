@@ -1,7 +1,6 @@
 import dash
 from dash import dcc, html,dash_table, callback_context
 from dash.dependencies import Input, Output, State
-import plotly.express as px
 import os
 import re
 import base64
@@ -95,7 +94,7 @@ def layout_data():
         multiple=False,
         accept='.csv,.tsv',
     ),
-    html.Div(id='output-data-upload',style={'display': 'inline-block'})
+    html.Div(id='output-data-upload',style={'display': 'inline-block','margin-bottom':'1em'})
         ]),
     html.Div(id='output-df-upload'),
     
@@ -119,7 +118,7 @@ def layout_data():
     ]),
 
     html.Div(children=[
-        html.H5("Presence of a reference taxa",style={'display': 'inline-block','margin-right': '10px'}),
+        html.H5("Presence of a reference taxa",style={'display': 'inline-block','margin-right': '10px','margin-top':'1em'}),
         dcc.Checklist(options=[{'label': '', 'value': 'checked',"disabled":True}],value=[],id='check-ref-taxa',persistence=True,persistence_type=type_storage,style={'display': 'inline-block'}),
         html.Span("i", id="info-icon-ref-taxa", title='''The reference taxa is a species with a low deviation/mean ratio. It will not be plotted on the final network. If no species is given by the user, the species with the lowest ratio will be chosen by default.''',
               style={'display': 'inline-block', 'marginLeft': '10px',
@@ -137,7 +136,7 @@ def layout_data():
     ]),
 
     html.Div(children=[
-        html.H5("Separate data in two groups",style={'display': 'inline-block','margin-right': '10px'}),
+        html.H5("Separate data in two groups",style={'display': 'inline-block','margin-right': '10px','margin-top':'1em','margin-bottom':'1em'}),
         dcc.Checklist(options=[{'label': '', 'value': 'checked',"disabled":True}],value=[],id='check-separate-data',persistence=True,persistence_type=type_storage,style={'display': 'inline-block'}),
         #html.Div(id='select-separate-data'),
         html.Div(id='select-separate-data',style={'display': 'none','vertical-align': 'middle'},children=[
@@ -154,9 +153,9 @@ def layout_data():
 
     #Filters Part
 
-    html.H5("Filters",style={'fontWeight': 'bold'}),
+    html.H5("Filters",style={'fontWeight': 'bold','margin-top':'0.5em'}),
 
-    html.Div(children=[
+    html.Div(style={'margin-top':'1em'},children=[
         html.H5("Delete columns with a certain pourcent of zeros",style={'display': 'inline-block','margin-right': '10px'}),
         dcc.Checklist(options=[{'label': '', 'value': 'checked',"disabled":True}],value=[],id='check-filter-columns-zero',persistence=True,persistence_type=type_storage,style={'display': 'inline-block'}),
         #html.Div(id='select-filter-columns-zero'),
@@ -169,7 +168,7 @@ def layout_data():
         
     ]),
 
-    html.Div(children=[
+    html.Div(style={'margin-top':'1em'},children=[
         html.H5("Keep columns with highest deviation/mean",style={'display': 'inline-block','margin-right': '10px'}),
         dcc.Checklist(options=[{'label': '', 'value': 'checked',"disabled":True}],value=[],id='check-filter-deviation-mean',persistence=True,persistence_type=type_storage,style={'display': 'inline-block'}),
         #html.Div(id='select-filter-deviation-mean'),
@@ -186,11 +185,11 @@ def layout_data():
 
     html.Div(style={'width': '30%', 'display': 'inline-block', 'verticalAlign': 'top'}, children=[
         # Contenu de la partie droite
-        html.H1("Data Informations"),
+        #html.H1("Data Informations"),
         # Ajoutez ici les composants de votre partie droite
         html.Div(children=[
 
-            html.Div(children=[
+            html.Div(style={'margin-top': '1em','margin-left': '20px'},children=[
 
                 html.Div(children=[html.H5("Initial Data",style={'fontWeight': 'bold'}),
 
@@ -209,7 +208,7 @@ def layout_data():
 
             ]),
 
-            html.Div(children=[
+            html.Div(style={'margin-top': '4em'},children=[
 
                 html.H5("Filtered Data",style={'fontWeight': 'bold'}),
                 html.Div(id="filtered-data-zeros"),
@@ -337,7 +336,8 @@ def create_dash_table(df):
     return html.Div([
         dash_table.DataTable(
             data=df.to_dict('records'),
-            columns=[{'name': i, 'id': i} for i in df.columns],
+            #columns=[{'name': i, 'id': i} for i in df.columns],
+            columns = [{'name': f"{i+1}. {col}", 'id': col} for i, col in enumerate(df.columns)],
             page_size=10,
             style_table={'overflowX': 'auto'},
             style_cell={
@@ -386,28 +386,28 @@ def check_intervals(interval_cov,interval_taxa,check_ref_taxa,check_separate_dat
         start_taxa, end_taxa = map(int, match_taxa.groups())
         start_cov, end_cov = map(int, match_cov.groups())
         if start_taxa>=end_taxa or start_cov>=end_cov:
-            info_cov=html.H5("Covariates: Covariates or Taxa field is in wrong order",style={"text-indent": '30px'})
-            output_cov=html.H5("Covariates or Taxa field is in wrong order (must have start<end)")
-            info_taxa=html.H5("Taxa: Covariates or Taxa field is in wrong order",style={"text-indent": '30px'})
-            output_taxa=html.H5("Covariates or Taxa field is in wrong order (must have start<end)")
+            info_cov=html.H5("Covariates: ERROR Covariates or Taxa field is in wrong order",style={"margin-left": '30px'})
+            output_cov=html.H5("ERROR Covariates or Taxa field is in wrong order (must have start<end)")
+            info_taxa=html.H5("Taxa: ERROR Covariates or Taxa field is in wrong order",style={"margin-left": '30px'})
+            output_taxa=html.H5("ERROR Covariates or Taxa field is in wrong order (must have start<end)")
         elif max(end_cov,end_taxa)>info_current_file_store["nb_columns"]:
-            info_cov=html.H5("Covariates: Interval upper bound too large",style={"text-indent": '30px'})
-            output_cov=html.H5(f"Upper bound to large: {max(end_cov,end_taxa)} (only {info_current_file_store["nb_columns"]} number)")
-            info_taxa=html.H5("Taxa: Interval upper bound too large",style={"text-indent": '30px'})
-            output_taxa=html.H5(f"Upper bound to large: {max(end_cov,end_taxa)} (only {info_current_file_store["nb_columns"]} number)")
+            info_cov=html.H5("Covariates: ERROR Interval upper bound too large",style={"margin-left": '30px'})
+            output_cov=html.H5(f"ERROR Upper bound to large: {max(end_cov,end_taxa)} (only {info_current_file_store["nb_columns"]} number)")
+            info_taxa=html.H5("Taxa: ERROR Interval upper bound too large",style={"margin-left": '30px'})
+            output_taxa=html.H5(f"ERROR Upper bound to large: {max(end_cov,end_taxa)} (only {info_current_file_store["nb_columns"]} number)")
         elif min(end_cov,end_taxa)>=max(start_taxa,start_cov):
             # Intervals overlap
-            info_cov=html.H5("Covariates: Intervals overlap",style={"text-indent": '30px'})
-            output_cov=html.H5(f"Intervals Overlap: {min(end_cov,end_taxa)} (upper bound) and {max(start_taxa,start_cov)} (lower bound)")
-            info_taxa=html.H5("Taxa: Intervals overlap",style={"text-indent": '30px'})
-            output_taxa=html.H5(f"Intervals Overlap: {min(end_cov,end_taxa)} (upper bound) and {max(start_taxa,start_cov)} (lower bound)")
+            info_cov=html.H5("Covariates: ERROR Intervals overlap",style={"margin-left": '30px'})
+            output_cov=html.H5(f"ERROR Intervals Overlap: {min(end_cov,end_taxa)} (upper bound) and {max(start_taxa,start_cov)} (lower bound)")
+            info_taxa=html.H5("Taxa: ERROR Intervals overlap",style={"margin-left": '30px'})
+            output_taxa=html.H5(f"ERROR Intervals Overlap: {min(end_cov,end_taxa)} (upper bound) and {max(start_taxa,start_cov)} (lower bound)")
         else:
             info_current_file_store["covar_start"],info_current_file_store["covar_end"]=start_cov,end_cov
             info_current_file_store["taxa_start"],info_current_file_store["taxa_end"]=start_taxa,end_taxa
             output_cov= html.H5(f"Valid interval : {start_cov} - {end_cov}",style={'display': 'inline-block','vertical-align': 'middle'})
-            info_cov=html.H5(f"Covariates: {end_cov-start_cov+1}",style={"text-indent": '30px'})
+            info_cov=html.H5(f"Covariates: {end_cov-start_cov+1}",style={"margin-left": '30px'})
             output_taxa= html.H5(f"Valid interval : {start_taxa} - {end_taxa}",style={'display': 'inline-block','vertical-align': 'middle'})
-            info_taxa=html.H5(f"Taxa: {end_taxa-start_taxa+1}",style={"text-indent": '30px'})
+            info_taxa=html.H5(f"Taxa: {end_taxa-start_taxa+1}",style={"margin-left": '30px'})
             options_check_boxes=[{'label': '', 'value': 'checked'}]
 
             
@@ -422,10 +422,10 @@ def check_intervals(interval_cov,interval_taxa,check_ref_taxa,check_separate_dat
                 values_check[3]=['checked']
     else:
         # At least one interval is empty or invalid. 
-        info_cov=html.H5(f"Covariates: Covariates or Taxa field is empty or incorrect",style={"text-indent": '30px'})
-        output_cov=html.H5("Covariates or Taxa field is empty or incorrect")
-        info_taxa=html.H5(f"Taxa: Covariates or Taxa field is empty or incorrect",style={"text-indent": '30px'})
-        output_taxa=html.H5("Covariates or Taxa field is empty or incorrect")
+        info_cov=html.H5(f"Covariates: ERROR Covariates or Taxa field is empty or incorrect",style={"margin-left": '30px'})
+        output_cov=html.H5("ERROR Covariates or Taxa field is empty or incorrect")
+        info_taxa=html.H5(f"Taxa: ERROR Covariates or Taxa field is empty or incorrect",style={"margin-left": '30px'})
+        output_taxa=html.H5("ERROR Covariates or Taxa field is empty or incorrect")
     
     return info_current_file_store,output_cov,info_cov,output_taxa,info_taxa,options_check_boxes,options_check_boxes,options_check_boxes,options_check_boxes,values_check[0],values_check[1],values_check[2],values_check[3]
         
@@ -593,7 +593,7 @@ def update_output_taxa(value,info_current_file_store):
             message=html.H5(f"Reference Taxa: {ref_taxa}",style={"text-indent": '30px'})
             info_current_file_store["reference_taxa"]=ref_taxa
         else:
-            message=html.H5("Reference Taxa: Error Enter Taxa interval",style={"text-indent": '30px'})
+            message=html.H5("Reference Taxa: ERROR Enter Taxa interval",style={"text-indent": '30px'})
             info_current_file_store["reference_taxa"]=None
         
         return info_current_file_store,{'display':'none'},None,None,None,message

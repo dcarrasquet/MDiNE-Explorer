@@ -4,10 +4,10 @@ from maindash import app,type_storage
 import dash
 from dash import dcc, html
 from dash.dependencies import Input, Output, State
-import plotly.express as px
-import os
-import re
-import base64
+# import plotly.express as px
+# import os
+# import re
+# import base64
 from dash.exceptions import PreventUpdate
 
 from views.home_view import layout_home
@@ -81,7 +81,10 @@ footer_style={
     'padding': '20px 0',
 }
 
-initial_info_current_file={
+completed=False
+
+if completed==False:
+    initial_info_current_file={
     'filename':None,
     'session_folder':None,
     'nb_rows':None,
@@ -99,7 +102,7 @@ initial_info_current_file={
     'status-run-model':'not-yet',
     'parameters_model':{
         'beta_matrix':{
-            'apriori':'Ridge',
+            'apriori':'Normal',
             'parameters':{
                 'alpha':1,
                 'beta':1
@@ -108,11 +111,44 @@ initial_info_current_file={
         'precision_matrix':{
             'apriori':'Lasso',
             'parameters':{
-                'lambda_init':10
+                'lambda_init':0.08
             }
         }
     }
 }
+else:
+    initial_info_current_file={
+        'filename':"data/dash_app/session_1/crohns-numeric-tsv.tsv",
+        'session_folder':"data/dash_app/session_1/",
+        'nb_rows':100,
+        'nb_columns':11,
+        'covar_start':2,
+        'covar_end':5,
+        'taxa_start':6,
+        'taxa_end':11,
+        'reference_taxa':'otu.counts.ref',
+        'phenotype_column':None,
+        'first_group':None,
+        'second_group':None,
+        'filter_zeros':None,
+        'filter_dev_mean':None,
+        'status-run-model':'completed',
+        'parameters_model':{
+            'beta_matrix':{
+                'apriori':'Normal',
+                'parameters':{
+                    'alpha':1,
+                    'beta':1
+                }
+            },
+            'precision_matrix':{
+                'apriori':'Lasso',
+                'parameters':{
+                    'lambda_init':0.08
+                }
+            }
+        }
+    }
 
 def make_layout():
     return html.Div(children=[
@@ -139,7 +175,8 @@ def make_layout():
         html.Div(id='div-data',style={'display':'none'},children=[layout_data()]),
         html.Div(id='div-model',style={'display':'none'},children=[layout_model()]),
         html.Div(id='div-visu',style={'display':'none'},children=[layout_visualization()]),
-        html.Div(id='div-export',style={'display':'none'},children=[layout_export_results()])
+        #html.Div(id='div-export',style={'display':'none'},children=[layout_export_results()]),
+        html.Div(id='div-export')
         ])
         
         ]),
@@ -157,7 +194,7 @@ def change_store_tab(tab):
               Output('div-data', 'style'),
               Output('div-model', 'style'),
               Output('div-visu', 'style'),
-              Output('div-export', 'style'),
+              Output('div-export', 'children'),
               Output('run-model-button','disabled',allow_duplicate=True),
               Output('run-model-button','title',allow_duplicate=True),
               #Input('tabs-mdine', 'value'),
@@ -169,25 +206,23 @@ def render_content(ts,tab,info_current_file_store):
     if ts is None:
         raise PreventUpdate
     display_none={'display':'none'}
-    #print("Tab:",tab)
     if tab == 'tab-home':
-        return None,display_none,display_none,display_none,display_none,None,None
+        return None,display_none,display_none,display_none,None,None,None
     elif tab == 'tab-data':
-        return display_none,None,display_none,display_none,display_none,None,None
+        return display_none,None,display_none,display_none,None,None,None
     elif tab == 'tab-model':
         if info_current_file_store["reference_taxa"]!=None and info_current_file_store["covar_end"]!=None and info_current_file_store["status-run-model"]=='not-yet':
-            return display_none,display_none,None,display_none,display_none,False,None
+            return display_none,display_none,None,display_none,None,False,None
         else:
             #At leat one error in the data section
             title="At least one error in the data section, please check the errors."
-            return display_none,display_none,None,display_none,display_none,True,title
+            return display_none,display_none,None,display_none,None,True,title
     elif tab == 'tab-visualization':
-        return display_none,display_none,display_none,None,display_none,None,None
+        return display_none,display_none,display_none,None,None,None,None
     elif tab == 'tab-export':
-        return display_none,display_none,display_none,display_none,None,None,None
+        return display_none,display_none,display_none,display_none,layout_export_results(info_current_file_store),None,None
 
 
 if __name__=="__main__":
-    #celery_app.start()
     app.layout=make_layout()
     app.run(host='127.0.0.1',port=8080,debug=True)

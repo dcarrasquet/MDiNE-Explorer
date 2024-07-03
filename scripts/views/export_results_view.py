@@ -27,9 +27,19 @@ button_style = {
     'hover': button_hover_style
 }
 
-def layout_export_results():
+def layout_export_results(info_current_file_store):
+    if info_current_file_store["status-run-model"]=="not-yet":
+        return html.H5("The inference has not been launched. Press Run model in the Model tab to download futur results.")
+    elif info_current_file_store["status-run-model"]=="in-progress":
+        return html.H5("The model is running. You can view the current status in the Model tab. Come back later to download the results")
+    elif info_current_file_store["status-run-model"]=="completed":
+        return make_real_layout()
+    else:
+        raise ValueError
+    
+
+def make_real_layout():
     return html.Div([
-            html.H3('Export Results Page'),
             html.Div([
                 html.Button("Download raw results", id="download-button",style=button_style),
                 dcc.Download(id="download")

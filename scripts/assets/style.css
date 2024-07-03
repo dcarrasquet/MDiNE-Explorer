@@ -43,3 +43,33 @@
     color: white; /* Keep the text color white for better readability */
     cursor: not-allowed;
 }
+
+
+/* assets/styles.css */
+#progress-bar {
+    width: 100%;
+    height: 20px; /* Hauteur réduite */
+    border-radius: 10px;
+    background-color: #e0e0e0;
+    overflow: hidden;
+}
+
+#progress-bar::-webkit-progress-bar {
+    background-color: #e0e0e0;
+    border-radius: 10px;
+}
+
+#progress-bar::-webkit-progress-value {
+    background-color: #0d6efd; /* Couleur modifiée */
+    border-radius: 10px;
+}
+
+#progress-bar::-moz-progress-bar {
+    background-color: #0d6efd; /* Couleur modifiée */
+    border-radius: 10px;
+}
+
+#progress-bar::progress-bar {
+    background-color: #0d6efd; /* Couleur modifiée */
+    border-radius: 10px;
+}

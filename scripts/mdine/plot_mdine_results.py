@@ -13,10 +13,92 @@ import plotly.graph_objects as go
 
 
 #from extract_data_files import get_species_list, separate_data_in_two_groups, get_data
-from mdine.extract_data_files import get_species_list, separate_data_in_two_groups, get_data
+#from mdine.extract_data_files import get_species_list, separate_data_in_two_groups, get_data
 
 
 # Create PDF Report with Reportlab
+
+def plot_all_figures_model():
+
+    #graph=pm.model_to_graphviz(mdine_model) # <class 'graphviz.graphs.Digraph'>
+
+    
+    #graph.render(folder+"model_graph",format="png")
+# Beta_matrix=idata.posterior.beta_matrix.values[3][-1]
+
+    # print("Beta Matrix:\n")
+    # print(Beta_matrix)
+
+    # with mdine_model:
+    #     ppc=pm.sample_posterior_predictive(idata,extend_inferencedata=True)
+
+    # az.plot_forest(idata, var_names=["beta_matrix"], hdi_prob=0.80)
+    # az.plot_forest(idata, var_names=["precision_matrix"], hdi_prob=0.80)
+
+    # az.plot_ppc(ppc,kind="kde")
+    # plt.plot()
+    # plt.show()
+    #### Parties pour sauvegarder toutes les figures
+
+    # save_figures=False
+
+    # if save_figures==True:
+
+    #     with mdine_model:
+    #         ppc=pm.sample_posterior_predictive(idata,extend_inferencedata=True)
+
+    #     az.plot_ppc(ppc,kind="kde")
+    #     plt.savefig(folder+"ppc_kde.png")
+
+    #     az.plot_ppc(ppc,kind="cumulative")
+    #     plt.savefig(folder+"ppc_cumulative.png")
+    #     #plt.plot()
+    #     #print(az.summary(idata, kind="stats"))
+
+    #     #print(idata.sample_stats)
+    #     idata.sample_stats["tree_depth"].plot(col="chain", ls="none", marker=".", alpha=0.3)
+    #     plt.savefig(folder+"sample_stats.png")
+        
+    #     az.plot_energy(idata, figsize=(6, 4))
+    #     plt.savefig(folder+"energy.png")
+
+    #     az.plot_posterior(idata, group="sample_stats", var_names="acceptance_rate", hdi_prob="hide", kind="hist")
+    #     plt.savefig(folder+"posterior.png")
+
+
+    #     #print("Divergence? :",idata.sample_stats["diverging"].sum())
+    #     az.plot_trace(idata, var_names=["beta_matrix"])
+    #     plt.savefig(folder+"beta_trace.png")
+    #     #az.plot_trace(idata, var_names=["beta_matrix","tau","lambda_horseshoe"])
+    #     #az.plot_trace(idata, var_names=["beta_matrix","pi_gamma","gamma"])
+    
+    #     #plt.show(block=False)
+
+    #     az.plot_forest(idata, var_names=["beta_matrix"], hdi_prob=0.80)
+    #     ax = plt.gca()
+
+    #     # Tracer une ligne verticale en rouge pointillée à x=0
+    #     #plt.plot(beta, np.arange(len(beta)), 'rx', label='Vraies données')
+    #     ax.axvline(x=0, color='red', linestyle='--')
+    #     plt.savefig(folder+"beta_forest.png")
+
+    #     az.plot_trace(idata, var_names=["precision_matrix"])
+    #     plt.savefig(folder+"precision_trace.png")
+    #     #az.plot_trace(idata, var_names=["beta_matrix","tau","lambda_horseshoe"])
+    #     #az.plot_trace(idata, var_names=["beta_matrix","pi_gamma","gamma"])
+    
+    #     #plt.show(block=False)
+
+    #     az.plot_forest(idata, var_names=["precision_matrix"], hdi_prob=0.80)
+    #     ax = plt.gca()
+
+    #     # Tracer une ligne verticale en rouge pointillée à x=0
+    #     #plt.plot(beta, np.arange(len(beta)), 'rx', label='Vraies données')
+    #     ax.axvline(x=0, color='red', linestyle='--')
+    #     plt.savefig(folder+"precision_forest.png")
+
+	    #plt.show()
+    return 0
 
 def create_figure_distributions():
 
@@ -104,21 +186,6 @@ def get_legend_element(legend_store):
     legend.append(line_full_edge)
 
     return legend
-
-# def get_legend_element2():
-
-
-#     legend_nodes = [
-#     {'data': {'id': 'legend_parent', 'label': 'Legend'}}, #'position':{'x': 2000, 'y': 2000}
-#     {'data': {'id': 'legend_node1', 'label': ' Positive Association', 'parent': 'legend_parent'},'grabbable': False,'position': {'x': 0, 'y': 0},'locked': True },
-#     {'data': {'id': 'legend_node2', 'label': ' Negative Association', 'parent': 'legend_parent'},'grabbable': False,'position': {'x': 0, 'y': 20},'locked': True},
-#     {'data': {'id': 'legend_node3', 'label': ' Species', 'parent': 'legend_parent'},'grabbable': False,'position': {'x': 0, 'y': 40},'locked': True},
-#     # {'data': {'id': 'legend_node1', 'label': ' Positive Association', 'parent': 'legend_parent'},'grabbable': False,},
-#     # {'data': {'id': 'legend_node2', 'label': ' Negative Association', 'parent': 'legend_parent'},'grabbable': False,},
-#     # {'data': {'id': 'legend_node3', 'label': ' Rien Association', 'parent': 'legend_parent'},'grabbable': False,},
-#     ]
-    
-#     return legend_nodes
 
 def get_legend_style_diff_network():
     return None
@@ -318,7 +385,6 @@ def get_legend_style(legend_store,network_type):
 
     return style_legend
 
-
 def plot_AUC_simulation(list_simulation):
 
     list_list_AUC=[]
@@ -346,7 +412,6 @@ def plot_AUC_simulation(list_simulation):
         list_list_AUC.append(list_AUC)
 
     boxplot_AUC(list_list_AUC,list_j_taxa,n_individus,k_covariates,model_generated_data)
-
 
 def boxplot_AUC(list_list_AUC,list_j_taxa,n_individus,k_covariates,data_model):
 
@@ -726,156 +791,157 @@ def co_occurence_network_cytoscape(idata,df_taxa,hdi,node_size,edge_width,list_p
 
     return elements
 
-def get_co_occurence_network(idata,species_list,correlation_matrix,density_pourcentage,edge_width):
+# def get_co_occurence_network(idata,species_list,correlation_matrix,density_pourcentage,edge_width):
 
-    hdi_precision_matrix = az.hdi(idata, var_names=["precision_matrix"], hdi_prob=density_pourcentage).precision_matrix
+#     hdi_precision_matrix = az.hdi(idata, var_names=["precision_matrix"], hdi_prob=density_pourcentage).precision_matrix
 
     
 
-    # Création du graphe
-    G = nx.Graph()
-    for i in range(len(species_list)):
-        G.add_node(species_list[i])
+#     # Création du graphe
+#     G = nx.Graph()
+#     for i in range(len(species_list)):
+#         G.add_node(species_list[i])
 
 
-    for i in range (len(correlation_matrix)):
-        for j in range (i):
-            lower_hdi=hdi_precision_matrix[i][j][0]
-            higher_hdi=hdi_precision_matrix[i][j][1]
-            if lower_hdi*higher_hdi>=0: 
-                #Same sign, do not contains null value. Create edge
-                coefficient = correlation_matrix[i, j]
-                couleur = 'green' if coefficient > 0 else 'red'
-                largeur = abs(coefficient) * edge_width  #Multiply by a factor to adjust the width of edges
-                G.add_edge(species_list[i], species_list[j], weight=largeur, color=couleur)
-            else: 
-                #Different sign, the edge isn't displayed
-                pass
-    return G
+#     for i in range (len(correlation_matrix)):
+#         for j in range (i):
+#             lower_hdi=hdi_precision_matrix[i][j][0]
+#             higher_hdi=hdi_precision_matrix[i][j][1]
+#             if lower_hdi*higher_hdi>=0: 
+#                 #Same sign, do not contains null value. Create edge
+#                 coefficient = correlation_matrix[i, j]
+#                 couleur = 'green' if coefficient > 0 else 'red'
+#                 largeur = abs(coefficient) * edge_width  #Multiply by a factor to adjust the width of edges
+#                 G.add_edge(species_list[i], species_list[j], weight=largeur, color=couleur)
+#             else: 
+#                 #Different sign, the edge isn't displayed
+#                 pass
+#     return G
 
 
-def get_co_occurence_network_interactive(idata,counts_matrix,species_list):
+# def get_co_occurence_network_interactive(idata,counts_matrix,species_list):
 
-    #precision_matrix=idata.posterior.precision_matrix.values[3][-1]
-    precision_matrix=idata.posterior.precision_matrix.mean(dim=["chain", "draw"])
+#     #precision_matrix=idata.posterior.precision_matrix.values[3][-1]
+#     precision_matrix=idata.posterior.precision_matrix.mean(dim=["chain", "draw"])
 
-    #print(precision_matrix)
-    # print("\n\n ########## \n\n")
+#     #print(precision_matrix)
+#     # print("\n\n ########## \n\n")
 
-    #counts_mean=np.mean(counts_matrix,axis=0)[:-1] #Remove the last reference column
-    counts_mean=counts_matrix.mean(axis=0).tolist()[:-1]
+#     #counts_mean=np.mean(counts_matrix,axis=0)[:-1] #Remove the last reference column
+#     counts_mean=counts_matrix.mean(axis=0).tolist()[:-1]
 
-    j_taxa=len(counts_mean)
+#     j_taxa=len(counts_mean)
 
-    # Correlation Matrix
-    correlation_matrix=np.zeros((j_taxa,j_taxa))
+#     # Correlation Matrix
+#     correlation_matrix=np.zeros((j_taxa,j_taxa))
 
-    for i in range (j_taxa):
-        for j in range (j_taxa):
-            correlation_matrix[i,j]=precision_matrix[i,j]/(math.sqrt(precision_matrix[i,i]*precision_matrix[j,j]))
+#     for i in range (j_taxa):
+#         for j in range (j_taxa):
+#             correlation_matrix[i,j]=precision_matrix[i,j]/(math.sqrt(precision_matrix[i,i]*precision_matrix[j,j]))
 
-    G=get_co_occurence_network(idata,species_list,correlation_matrix,density_pourcentage=0.5,edge_width=4)
+#     G=get_co_occurence_network(idata,species_list,correlation_matrix,density_pourcentage=0.5,edge_width=4)
 
-    pos = nx.spring_layout(G)  # Déterminer la disposition du graph
+#     pos = nx.spring_layout(G)  # Déterminer la disposition du graph
 
-    fig, ax = plt.subplots()
-    nx.draw(G, pos, ax=ax)
+#     fig, ax = plt.subplots()
+#     nx.draw(G, pos, ax=ax)
 
-    edge_colors = nx.get_edge_attributes(G, 'color').values()
-    edge_widths = nx.get_edge_attributes(G, 'weight').values()
+#     edge_colors = nx.get_edge_attributes(G, 'color').values()
+#     edge_widths = nx.get_edge_attributes(G, 'weight').values()
 
-    #nx.draw(G, pos, with_labels=True,node_color="yellow",node_size=counts_mean*new_nodes_size, edge_color=edge_colors, width=list(edge_widths),ax=ax)
-    nx.draw(G, pos, with_labels=True,node_color="yellow",node_size=counts_mean*2, edge_color=edge_colors, width=list(edge_widths),ax=ax)
+#     #nx.draw(G, pos, with_labels=True,node_color="yellow",node_size=counts_mean*new_nodes_size, edge_color=edge_colors, width=list(edge_widths),ax=ax)
+#     nx.draw(G, pos, with_labels=True,node_color="yellow",node_size=counts_mean*2, edge_color=edge_colors, width=list(edge_widths),ax=ax)
 
-    node_selected = None
+#     node_selected = None
 
-    ######### Interactivité de graphique
+#     ######### Interactivité de graphique
 
-    def on_press(event):
-        nonlocal pos,node_selected
-        if event.inaxes is not None:
-            x, y = event.xdata, event.ydata
-            for node, (nx, ny) in pos.items():
-                dist = (x - nx) ** 2 + (y - ny) ** 2
-                if dist < 0.01:
-                    node_selected = node
-                    break
+#     def on_press(event):
+#         nonlocal pos,node_selected
+#         if event.inaxes is not None:
+#             x, y = event.xdata, event.ydata
+#             for node, (nx, ny) in pos.items():
+#                 dist = (x - nx) ** 2 + (y - ny) ** 2
+#                 if dist < 0.01:
+#                     node_selected = node
+#                     break
 
-    def on_release(event):
-        nonlocal pos,node_selected
-        node_selected = None
+#     def on_release(event):
+#         nonlocal pos,node_selected
+#         node_selected = None
 
-    def on_motion(event):
-        nonlocal pos, node_selected
-        if node_selected is not None:
-            x, y = event.xdata, event.ydata
-            pos[node_selected] = (x, y)
-            update()
+#     def on_motion(event):
+#         nonlocal pos, node_selected
+#         if node_selected is not None:
+#             x, y = event.xdata, event.ydata
+#             pos[node_selected] = (x, y)
+#             update()
     
 
-    # Créer des curseurs pour modifier les paramètres
-    ax_param_credibility = plt.axes([0.1, 0.10, 0.8, 0.03])
-    ax_param_edges_width = plt.axes([0.1, 0.05, 0.8, 0.03])
-    ax_param_nodes_size = plt.axes([0.1, 0.0, 0.8, 0.03])
+#     # Créer des curseurs pour modifier les paramètres
+#     ax_param_credibility = plt.axes([0.1, 0.10, 0.8, 0.03])
+#     ax_param_edges_width = plt.axes([0.1, 0.05, 0.8, 0.03])
+#     ax_param_nodes_size = plt.axes([0.1, 0.0, 0.8, 0.03])
     
 
-    slider_param_credibility = Slider(ax=ax_param_credibility, label='Credibility', valmin=0.01, valmax=0.99, valinit=0.5)
-    slider_param_edges_width = Slider(ax=ax_param_edges_width, label='Edges Width', valmin=0.5, valmax=20, valinit=4.)
-    slider_param_nodes_size = Slider(ax=ax_param_nodes_size, label='Nodes Size', valmin=0.1, valmax=5, valinit=1.0)
+#     slider_param_credibility = Slider(ax=ax_param_credibility, label='Credibility', valmin=0.01, valmax=0.99, valinit=0.5)
+#     slider_param_edges_width = Slider(ax=ax_param_edges_width, label='Edges Width', valmin=0.5, valmax=20, valinit=4.)
+#     slider_param_nodes_size = Slider(ax=ax_param_nodes_size, label='Nodes Size', valmin=0.1, valmax=5, valinit=1.0)
 
-    def update(val=None):
-        new_credibility=slider_param_credibility.val
-        new_edges_width=slider_param_edges_width.val
-        new_nodes_size=slider_param_nodes_size.val
+#     def update(val=None):
+#         new_credibility=slider_param_credibility.val
+#         new_edges_width=slider_param_edges_width.val
+#         new_nodes_size=slider_param_nodes_size.val
 
-        ax.clear()
+#         ax.clear()
 
-        G=get_co_occurence_network(idata,species_list,correlation_matrix,new_credibility,new_edges_width)
+#         G=get_co_occurence_network(idata,species_list,correlation_matrix,new_credibility,new_edges_width)
 
-        #pos = nx.spring_layout(G)  # Déterminer la disposition du graph
+#         #pos = nx.spring_layout(G)  # Déterminer la disposition du graph
 
-        edge_colors = nx.get_edge_attributes(G, 'color').values()
-        edge_widths = nx.get_edge_attributes(G, 'weight').values()
+#         edge_colors = nx.get_edge_attributes(G, 'color').values()
+#         edge_widths = nx.get_edge_attributes(G, 'weight').values()
 
-        #nx.draw(G, pos, with_labels=True,node_color="yellow",node_size=counts_mean*new_nodes_size, edge_color=edge_colors, width=list(edge_widths),ax=ax)
-        nx.draw(G, pos, with_labels=True,node_color="yellow",node_size=counts_mean*new_nodes_size, edge_color=edge_colors, width=list(edge_widths),ax=ax)
-        fig.canvas.draw_idle()
+#         #nx.draw(G, pos, with_labels=True,node_color="yellow",node_size=counts_mean*new_nodes_size, edge_color=edge_colors, width=list(edge_widths),ax=ax)
+#         nx.draw(G, pos, with_labels=True,node_color="yellow",node_size=counts_mean*new_nodes_size, edge_color=edge_colors, width=list(edge_widths),ax=ax)
+#         fig.canvas.draw_idle()
 
-    # Associer la fonction de mise à jour aux curseurs
-    slider_param_credibility.on_changed(update)
-    slider_param_edges_width.on_changed(update)
-    slider_param_nodes_size.on_changed(update)
+#     # Associer la fonction de mise à jour aux curseurs
+#     slider_param_credibility.on_changed(update)
+#     slider_param_edges_width.on_changed(update)
+#     slider_param_nodes_size.on_changed(update)
 
-    # Connecter la fonction de mise à jour à l'événement de clic de la souris
-    fig.canvas.mpl_connect('button_press_event', on_press)
-    fig.canvas.mpl_connect('button_release_event', on_release)
-    fig.canvas.mpl_connect('motion_notify_event', on_motion)
+#     # Connecter la fonction de mise à jour à l'événement de clic de la souris
+#     fig.canvas.mpl_connect('button_press_event', on_press)
+#     fig.canvas.mpl_connect('button_release_event', on_release)
+#     fig.canvas.mpl_connect('motion_notify_event', on_motion)
 
-    return fig
+#     return fig
 
     #plt.show()
 
-def plot_all_results(filename):
-    # Charger la variable à partir du fichier
-    with open(filename, "rb") as f:
-        idata = pickle.load(f)
+# def plot_all_results(filename):
+#     # Charger la variable à partir du fichier
+#     with open(filename, "rb") as f:
+#         idata = pickle.load(f)
 
-    get_info(idata)
+#     get_info(idata)
 
-    #Posteriors distributions and traces
-    az.plot_trace(idata, var_names=["precision_matrix", "beta_matrix"])#trace_kwargs={"title": f"Beta: {beta_matrix_choice} et Precision: {precision_matrix_choice}"}
+#     #Posteriors distributions and traces
+#     az.plot_trace(idata, var_names=["precision_matrix", "beta_matrix"])#trace_kwargs={"title": f"Beta: {beta_matrix_choice} et Precision: {precision_matrix_choice}"}
 
-    # Forest
-    get_forest(idata,["precision_matrix", "beta_matrix"])
+#     # Forest
+#     get_forest(idata,["precision_matrix", "beta_matrix"])
 
-    species_list=get_species_list("data/crohns.csv")
+#     #species_list=get_species_list("data/crohns.csv")
+#     species_list=[]
 
-    (covariate_matrix_data,counts_matrix_data,Z_vector)=get_data("data/crohns.csv")
-    first_group,second_group=separate_data_in_two_groups(covariate_matrix_data,counts_matrix_data,Z_vector)
+#     (covariate_matrix_data,counts_matrix_data,Z_vector)=get_data("data/crohns.csv")
+#     first_group,second_group=separate_data_in_two_groups(covariate_matrix_data,counts_matrix_data,Z_vector)
 
-    counts_matrix=first_group[1]
+#     counts_matrix=first_group[1]
 
-    get_co_occurence_network_interactive(idata,counts_matrix,species_list)
+#     get_co_occurence_network_interactive(idata,counts_matrix,species_list)
 
 def study_idata_file():
     filename="test_mdine/simulation_2/test_0/idata.pkl"
@@ -944,6 +1010,12 @@ def get_energy_figure(idata):
     legend_texts = [text.get_text() for text in ax.legend().get_texts()]
     #print("Legend initiale: ",legend_texts)
 
+    # Extract BFMI values from legend texts and add them as annotations
+    annotations = []
+    for text in legend_texts:
+        if 'BFMI' in text:
+            annotations.append(text)
+
     i=0
     for line in ax.get_lines():
         #print("Et de 1")
@@ -956,7 +1028,23 @@ def get_energy_figure(idata):
             i+=1
             data.append(trace)
 
-    plotly_fig = go.Figure(data=data)
+    # Create a layout for the plotly figure
+    layout = go.Layout(
+        annotations=[
+            dict(
+                x=1.00,
+                y=1 - i * 0.1,
+                xref='paper',
+                yref='paper',
+                showarrow=False,
+                text=annotation,
+                align='left'
+            ) for i, annotation in enumerate(annotations)
+        ],
+        margin=dict(r=200)
+    )
+
+    plotly_fig = go.Figure(data=data,layout=layout)
 
     return plotly_fig
 

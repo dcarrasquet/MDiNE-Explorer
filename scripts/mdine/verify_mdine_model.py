@@ -19,10 +19,10 @@ import json
 
 #from MDiNE_model import run_model
 
-try:
-	from mdine.extract_data_files import get_data,separate_data_in_two_groups
-except ImportError:
-	from extract_data_files import get_data,separate_data_in_two_groups
+# try:
+# 	from mdine.extract_data_files import get_data,separate_data_in_two_groups
+# except ImportError:
+# 	from extract_data_files import get_data,separate_data_in_two_groups
 
 def create_json_file_model():
 
@@ -112,27 +112,30 @@ def ppf_ZINB(quantile,n,p,pi_proportion):
 	return i
 
 def get_info_data_file():
-	(covariate_matrix_data,counts_matrix_data,Z_vector)=get_data("data/crohns.csv")
-	first_group,second_group=separate_data_in_two_groups(covariate_matrix_data,counts_matrix_data,Z_vector)# covariate puis counts
-	sommes = np.sum(first_group[1], axis=1)
-	#variances = np.var(first_group[1], axis=1)
+	return 0
 
-	#print("Sommes des lignes:  ",len(sommes))
+# def get_info_data_file():
+# 	(covariate_matrix_data,counts_matrix_data,Z_vector)=get_data("data/crohns.csv")
+# 	first_group,second_group=separate_data_in_two_groups(covariate_matrix_data,counts_matrix_data,Z_vector)# covariate puis counts
+# 	sommes = np.sum(first_group[1], axis=1)
+# 	#variances = np.var(first_group[1], axis=1)
 
-	zeros_count = 1 - np.count_nonzero(counts_matrix_data, axis=0)/counts_matrix_data.shape[0]
+# 	#print("Sommes des lignes:  ",len(sommes))
+
+# 	zeros_count = 1 - np.count_nonzero(counts_matrix_data, axis=0)/counts_matrix_data.shape[0]
 
 
-	list_variance=np.var(counts_matrix_data,axis=0)
-	list_mean=np.mean(counts_matrix_data,axis=0)
+# 	list_variance=np.var(counts_matrix_data,axis=0)
+# 	list_mean=np.mean(counts_matrix_data,axis=0)
 
-	# plt.hist(sommes, bins=10, color='skyblue', edgecolor='black')
-	# plt.xlabel('Valeurs')
-	# plt.ylabel('Fréquence')
-	# plt.title('Histogramme des entiers')
+# 	# plt.hist(sommes, bins=10, color='skyblue', edgecolor='black')
+# 	# plt.xlabel('Valeurs')
+# 	# plt.ylabel('Fréquence')
+# 	# plt.title('Histogramme des entiers')
 
-	# # Afficher le graphique
-	# plt.show()
-	return(zeros_count,list_mean,list_variance)
+# 	# # Afficher le graphique
+# 	# plt.show()
+# 	return(zeros_count,list_mean,list_variance)
 
 
 def extract_data_pickle():
