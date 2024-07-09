@@ -1,31 +1,22 @@
 import dash
 from dash import dcc, html,callback_context
 from dash.dependencies import Input, Output, State
-import dash_bootstrap_components as dbc
-#import plotly.express as px
 import os
 import re
-#import base64
 from dash.exceptions import PreventUpdate
-import time
-import queue
+
 import pty
 import sys
 import json
+import psutil
 
 import threading
 import subprocess
-import pexpect
-import shlex
-# import io
-# import contextlib
 
-from maindash import app,type_storage #info_current_file,
+from maindash import app,type_storage
 
 # from mdine.MDiNE_model import run_model
 # from mdine.extract_data_files import get_separate_data
-
-model_thread = None
 
 button_hover_style = {
     'background': '#4A90E2'
@@ -74,11 +65,19 @@ input_field_number_style = {
 }
 
 def layout_model():
+    list_hyperparameters_beta_lasso=["alpha_lambda","beta_lambda","alpha_sigma","beta_sigma"]
+    list_latex_expressions_beta_lasso=["\\alpha_{\\lambda}","\\beta_{\\lambda}","\\alpha_{\\sigma}","\\beta_{\\sigma}"]
+    list_children_beta_lasso=[]
+    for i in range(len(list_hyperparameters_beta_lasso)):
+        parameter=list_hyperparameters_beta_lasso[i]
+        latex_expression=list_latex_expressions_beta_lasso[i]
+        input_parameter=dcc.Input(id=f'{parameter}_lasso',type='number',placeholder='1',min=0,value=1,step='any',style=input_field_number_style)
+        parameter=html.Div(children=[dcc.Markdown(f"${latex_expression}$", mathjax=True,style={"text-indent":"30px","display":"inline-block"}),input_parameter])
+        list_children_beta_lasso.append(parameter)
     return html.Div([
             #html.H3('Model Page'),
             html.Div(style={'width': '30%', 'display': 'inline-block', 'verticalAlign': 'top','clear': 'both'}, children=[
 
-                dcc.Store(id='process-pid-store', storage_type=type_storage,data=None),
                 dcc.Store(id='progressbar-info', storage_type=type_storage),
 
                 html.Details([
@@ -95,7 +94,7 @@ def layout_model():
                                     {'label': 'Ridge', 'value': 'Ridge'},
                                     {'label': 'Lasso', 'value': 'Lasso'},
                                     {'label': 'Horseshoe', 'value': 'Horseshoe'},
-                                    #{'label': 'Spike-and-Slab', 'value': 'Spike-and-Slab'},
+                                    {'label': 'Spike-and-Slab', 'value': 'Spike-and-Slab','disabled': True},
                                 ],
                                 placeholder="Select an option",
                                 multi=False,
@@ -110,7 +109,22 @@ def layout_model():
                         #html.Div(children=[html.H5("Initial Data",style={'fontWeight': 'bold'}),
                         html.Div(children=[
                             html.H5("Hyperparameters",style={'text-indent':'15px'}),
-                            html.Div(id="hyperparameters-beta")
+                            #html.Div(id="hyperparameters-beta"),
+                            html.Div(id="hyper-beta-ridge",children=[
+                                html.Div(children=[
+                                    dcc.Markdown("$\\alpha$", mathjax=True,style={"text-indent":"30px","display":"inline-block"}),
+                                    dcc.Input(id='alpha_ridge',type='number',placeholder='1',min=0,value=1,step='any',style=input_field_number_style)]),
+                                html.Div(children=[
+                                    dcc.Markdown("$\\beta$", mathjax=True,style={"text-indent":"30px","display":"inline-block"}),
+                                    dcc.Input(id='beta_ridge',type='number',placeholder='1',min=0,value=1,step='any',style=input_field_number_style)])
+                            ]),
+                            html.Div(id="hyper-beta-lasso",children=list_children_beta_lasso),
+                            html.Div(id="hyper-beta-horseshoe",children=[
+                                    dcc.Markdown("$\\beta$", mathjax=True,style={"text-indent":"30px","display":"inline-block"}),
+                                    dcc.Input(id='beta_horseshoe',type='number',placeholder='1',min=0,value=1,step='any',style=input_field_number_style)
+                                    #])
+
+                            ]),
                 
                         ]),
                         html.H5("Precision Matrix",style={'fontWeight': 'bold'}),
@@ -138,18 +152,28 @@ def layout_model():
                         #html.Div(children=[html.H5("Initial Data",style={'fontWeight': 'bold'}),
                         html.Div(children=[
                             html.H5("Hyperparameters",style={'text-indent':'15px'}),
-                            html.Div(id="hyperparameters-precision-matrix")
+                            #html.Div(id="hyperparameters-precision-matrix"),
+                            html.Div(id="hyper-precision-lasso",children=[
+                                dcc.Markdown("$\\lambda_{init}$", mathjax=True,style={"text-indent":"30px","display":"inline-block"}),
+                                dcc.Input(id='lambda_init_lasso',type='number',placeholder='1',min=0,value=1,step='any',style=input_field_number_style)
+                            ]),
+                            html.Div(id="hyper-precision-inv-wishart"),
+                            html.Div(id="hyper-precision-inv-wishart-penalized"),
                 
                         ]),
                         
                     ], id='advanced-parameters')
                 ], id='details',open=False),
-                html.Button('Run Model', id='run-model-button', n_clicks=0),
+                html.Div([
+                    html.Button('Run Model', id='run-model-button', n_clicks=0,disabled=True),
+                    html.Button('Cancel Model', id='cancel-model-button', n_clicks=0),
+                ]),
+                
                 dcc.Interval(id='interval-component',interval=2000, n_intervals=0),
                 dcc.Store(id='run-model-status', storage_type=type_storage),
                 html.Div(id="run-model-output"),
-                html.Div(id="output-area"),
-                html.Progress(id="progress-bar", value="0", max="100"),
+                # html.Div(id="output-area"),
+                # html.Progress(id="progress-bar", value="0", max="100"),
 
 
             ]),
@@ -222,19 +246,137 @@ def layout_model():
             ])
         ])
 
+@app.callback(Output("info-current-file-store","data",allow_duplicate=True),
+              Output("hyper-beta-ridge","style",allow_duplicate=True),
+              Output("hyper-beta-lasso","style",allow_duplicate=True),
+              Output("hyper-beta-horseshoe","style",allow_duplicate=True),
+              Output("hyper-precision-lasso","style",allow_duplicate=True),
+              Output("hyper-precision-inv-wishart","style",allow_duplicate=True),
+              Output("hyper-precision-inv-wishart-penalized","style",allow_duplicate=True),
+              Output("apriori-beta-input","value"),
+              Output("apriori-precision-matrix-input","value"),
+              Output("alpha_ridge","value"),
+              Output("beta_ridge","value"),
+              Output("lambda_init_lasso","value"),
+              Input("reset-values-button","n_clicks"),
+              State("info-current-file-store","data"),prevent_initial_call=True)
+def reset_values(n_clicks,info_current_file_store):
+    if n_clicks==None:
+        raise PreventUpdate
+    style_none={"display":"none"}
+    alpha_ridge=1
+    beta_ridge=1
+    lambda_init=1
+    info_current_file_store["parameters_model"]={
+        'beta_matrix':{
+            'apriori':'Ridge',
+            'parameters':{
+                'alpha':alpha_ridge,
+                'beta':beta_ridge
+            }
+        },
+        'precision_matrix':{
+            'apriori':'Lasso',
+            'parameters':{
+                'lambda_init':lambda_init
+            }
+        }
+    }
+    return info_current_file_store,None,style_none,style_none,None,style_none,style_none,"Ridge","Lasso",alpha_ridge,beta_ridge,lambda_init
 
+
+@app.callback(Output("info-current-file-store","data",allow_duplicate=True),
+              Output("hyper-beta-ridge","style",allow_duplicate=True),
+              Output("hyper-beta-lasso","style",allow_duplicate=True),
+              Output("hyper-beta-horseshoe","style",allow_duplicate=True),
+              Output("hyper-precision-lasso","style",allow_duplicate=True),
+              Output("hyper-precision-inv-wishart","style",allow_duplicate=True),
+              Output("hyper-precision-inv-wishart-penalized","style",allow_duplicate=True),
+              Input('apriori-beta-status', 'data'),
+              Input('apriori-precision-matrix-status', 'data'),
+              Input("alpha_ridge","value"),
+              Input("beta_ridge","value"),
+              Input("alpha_lambda_lasso","value"),
+              Input("beta_lambda_lasso","value"),
+              Input("alpha_sigma_lasso","value"),
+              Input("beta_sigma_lasso","value"),
+              Input("beta_horseshoe","value"),
+              Input("lambda_init_lasso","value"),
+              State("info-current-file-store","data"),prevent_initial_call=True)
+def change_parameters_model(choice_beta,choice_precision,alpha_ridge,beta_ridge,alpha_l_lasso,beta_l_lasso,alpha_s_lasso,beta_s_lasso,beta_horseshoe,lambda_init,info_current_file_store):
+    style_none={"display":"none"}
+
+    style_beta_ridge=None
+    style_beta_lasso=None
+    style_beta_horseshoe=None
+    style_prec_lasso=None
+    style_prec_inv_wishart=None
+    style_prec_inv_wishart_penalized=None
+
+    ##Beta Matrix
+    if choice_beta["value"]=="Ridge":
+        info_current_file_store["parameters_model"]["beta_matrix"]={
+            'apriori':"Ridge",
+            'parameters':{
+                'alpha':alpha_ridge,
+                'beta':beta_ridge,
+            }
+        }
+        style_beta_lasso=style_none
+        style_beta_horseshoe=style_none
+    elif choice_beta["value"]=="Lasso":
+        info_current_file_store["parameters_model"]["beta_matrix"]={
+            'apriori':"Lasso",
+            'parameters':{
+                'alpha_lambda':alpha_l_lasso,
+                'beta_lambda':beta_l_lasso,
+                'alpha_sigma':alpha_s_lasso,
+                'beta_sigma':beta_s_lasso,
+            }
+        }
+        style_beta_ridge=style_none
+        style_beta_horseshoe=style_none
+    elif choice_beta["value"]=="Horseshoe":
+        info_current_file_store["parameters_model"]["beta_matrix"]={
+            'apriori':"Horseshoe",
+            'parameters':{
+                'beta_tau':beta_horseshoe,
+            }
+        }
+        style_beta_ridge=style_none
+        style_beta_lasso=style_none
+
+    ##Precision Matrix 
+    if choice_precision["value"]=="Lasso":
+        info_current_file_store["parameters_model"]["precision_matrix"]={
+            'apriori':"Lasso",
+            'parameters':{
+                'lambda_init':lambda_init,
+            }
+        }
+        style_prec_inv_wishart=style_none
+        style_prec_inv_wishart_penalized=style_none
+    elif choice_precision["value"]=="InvWishart":
+        info_current_file_store["parameters_model"]["precision_matrix"]={
+            'apriori':"InvWishart"
+        }
+        style_prec_lasso=style_none
+        style_prec_inv_wishart_penalized=style_none
+    elif choice_precision["value"]=="InvWishart Penalized":
+        info_current_file_store["parameters_model"]["precision_matrix"]={
+            'apriori':"Invwishart_penalized"
+        }
+        style_prec_lasso=style_none
+        style_prec_inv_wishart=style_none
+
+    return info_current_file_store,style_beta_ridge,style_beta_lasso,style_beta_horseshoe,style_prec_lasso,style_prec_inv_wishart,style_prec_inv_wishart_penalized
 
 
 # add a click to the appropriate store.
 @app.callback(Output('apriori-beta-status', 'data'),
-                #Input("phenotype-column-button", 'n_clicks'),
                 Input("apriori-beta-input","value"),
                 State('apriori-beta-status', 'data'))
 def on_click(value, data):
-    # if n_clicks is None:
-    #     # prevent the None callbacks is important with the store component.
-    #     # you don't want to update the store for nothing.
-    #     raise PreventUpdate
     if value is None:
         raise PreventUpdate
 
@@ -244,143 +386,20 @@ def on_click(value, data):
     data["value"]=value
 
     return data
-
-# output the stored clicks in the table cell.
-@app.callback(Output("hyperparameters-beta", 'children'),
-                Input('apriori-beta-status', 'modified_timestamp'),
-                State('apriori-beta-status', 'data'))
-def on_data(ts, data):
-    if ts is None:
-        raise PreventUpdate
-
-    data = data or {}
-
-    if data.get('value',None)==None:
-        return #html.H5('Rien')
-    else:
-        if data["value"]=="":
-            return "Error : The field cannot be empty."
-        elif data["value"]=="Ridge":
-            input_alpha=dcc.Input(id='alpha_ridge',type='number',placeholder='1',min=0,value=1,step='any',style=input_field_number_style)
-            alpha=html.Div(children=[dcc.Markdown("$\\alpha$", mathjax=True,style={"text-indent":"30px","display":"inline-block"}),input_alpha])
-            input_beta=dcc.Input(id='beta_ridge',type='number',placeholder='1',min=0,value=1,step='any',style=input_field_number_style)
-            beta=html.Div(children=[dcc.Markdown("$\\beta$", mathjax=True,style={"text-indent":"30px","display":"inline-block"}),input_beta])
-            return [alpha,beta]
-        
-        elif data["value"]=="Lasso":
-            list_hyperparameters=["alpha_lambda","beta_lambda","alpha_sigma","beta_sigma"]
-            list_latex_expressions=["\\alpha_{\\lambda}","\\beta_{\\lambda}","\\alpha_{\\sigma}","\\beta_{\\sigma}"]
-            list_children=[]
-            for i in range(len(list_hyperparameters)):
-                parameter=list_hyperparameters[i]
-                latex_expression=list_latex_expressions[i]
-                input_parameter=dcc.Input(id=f'{parameter}_lasso',type='number',placeholder='1',min=0,value=1,step='any',style=input_field_number_style)
-                parameter=html.Div(children=[dcc.Markdown(f"${latex_expression}$", mathjax=True,style={"text-indent":"30px","display":"inline-block"}),input_parameter])
-                list_children.append(parameter)
-            return list_children
-        
-        elif data["value"]=="Horseshoe":
-            input_beta=dcc.Input(id='beta_horseshoe',type='number',placeholder='1',min=0,value=1,step='any',style=input_field_number_style)
-            beta=html.Div(children=[dcc.Markdown("$\\beta$", mathjax=True,style={"text-indent":"30px","display":"inline-block"}),input_beta])
-            return beta
-        elif data["value"]=="Spike-and-Slab":
-            return
-        else:
-            return "Error"
-
 
 # add a click to the appropriate store.
 @app.callback(Output('apriori-precision-matrix-status', 'data'),
-                #Input("phenotype-column-button", 'n_clicks'),
                 Input("apriori-precision-matrix-input","value"),
                 State('apriori-precision-matrix-status', 'data'))
 def on_click(value, data):
-    # if n_clicks is None:
-    #     # prevent the None callbacks is important with the store component.
-    #     # you don't want to update the store for nothing.
-    #     raise PreventUpdate
     if value is None:
         raise PreventUpdate
 
-    # Give a default data dict with 0 clicks if there's no data.
     data = data or {'value': ""}
 
     data["value"]=value
 
     return data
-
-# output the stored clicks in the table cell.
-@app.callback(Output("hyperparameters-precision-matrix", 'children',allow_duplicate=True),
-                Input('apriori-precision-matrix-status', 'modified_timestamp'),
-                State('apriori-precision-matrix-status', 'data'),prevent_initial_call=True)
-def on_data(ts, data):
-    if ts is None:
-        raise PreventUpdate
-
-    data = data or {}
-
-    if data.get('value',None)==None:
-        return #html.H5('Rien')
-    else:
-        if data["value"]=="":
-            return "Error : The field cannot be empty."
-        elif data["value"]=="Lasso":
-            input_lambda_init=dcc.Input(id='lambda_init_lasso',type='number',placeholder='1',min=0,value=1,step='any',style=input_field_number_style)
-            lambda_init=html.Div(children=[dcc.Markdown("$\\lambda_{init}$", mathjax=True,style={"text-indent":"30px","display":"inline-block"}),input_lambda_init])
-            return lambda_init
-        
-        elif data["value"]=="InvWishart":
-            list_hyperparameters=["alpha_lambda","beta_lambda","alpha_sigma","beta_sigma"]
-            list_latex_expressions=["\\alpha_{\\lambda}","\\beta_{\\lambda}","\\alpha_{\\sigma}","\\beta_{\\sigma}"]
-            list_children=[]
-            for i in range(len(list_hyperparameters)):
-                parameter=list_hyperparameters[i]
-                latex_expression=list_latex_expressions[i]
-                input_parameter=dcc.Input(id=f'{parameter}_lasso',type='number',placeholder='1',min=0,value=1,step='any',style=input_field_number_style,)
-                parameter=html.Div(children=[dcc.Markdown(f"${latex_expression}$", mathjax=True,style={"text-indent":"30px","display":"inline-block"}),input_parameter])
-                list_children.append(parameter)
-            return list_children
-        
-        elif data["value"]=="InvWishart Penalized":
-            input_beta=dcc.Input(id='beta_horseshoe',type='number',placeholder='1',min=0,value=1,step='any',style=input_field_number_style,)
-            beta=html.Div(children=[dcc.Markdown("$\\beta$", mathjax=True,style={"text-indent":"30px","display":"inline-block"}),input_beta])
-            return beta
-        elif data["value"]=="Spike-and-Slab":
-            return
-        else:
-            return "Error"
-
-# def execute_model(info_current_file_store):
-#     pid, fd = pty.fork()
-#     print("PID:",pid)
-#     print("Execute model pid",os.getpid())
-#     print("Je passe pas mal de fois ici")
-#     if pid == 0:
-
-#         print("Execute model inside pid",os.getpid())
-
-#         info_current_file_store_str=json.dumps(info_current_file_store)
-#         #cmd=[sys.executable, 'scripts/mdine/MDiNE_model.py',info_current_file_store_str]
-#         cmd=f"python scripts/mdine/MDiNE_model.py {info_current_file_store}"
-#         process = pexpect.spawn(cmd, timeout=None, encoding='utf-8')
-
-#         while True:
-#             try:
-#                 line = process.readline().strip()
-#                 if not line:
-#                     break
-#                 print(f"Sortie du processus : {line}")
-#             except pexpect.EOF:
-#                 break
-        
-#         #os.execvp(sys.executable, [sys.executable, 'scripts/mdine/MDiNE_model.py',info_current_file_store_str])
-#     else:
-#         # Processus parent : lit la sortie du processus enfant
-#         try:
-#             read_output(fd)
-#         finally:
-#             os.waitpid(pid, 0)  # Attend la fin du processus enfant
-#     print("On sait jamais je peux passer par la")
 
 
 # add a click to the appropriate store.
@@ -391,12 +410,6 @@ def on_click(n_clicks,data):
 
     data = data or {'run_model': False}
 
-    #print("Actual data run model: ",data)
-
-    # if n_clicks==0:
-    #     # prevent the None callbacks is important with the store component.
-    #     # you don't want to update the store for nothing.
-    #     raise PreventUpdate 
     
     if n_clicks>0:
         #print("Je passe run model à True")
@@ -406,33 +419,29 @@ def on_click(n_clicks,data):
 
 # output the stored clicks in the table cell.
 @app.callback(Output("info-current-file-store", 'data',allow_duplicate=True),
-        Output("run-model-output", 'children'),
-              Output("output-area","children"),
+            Output("run-model-output", 'children'),
               Output("run-model-button",'disabled'),
               Output("run-model-button","title"),
-              Output("process-pid-store",'data'),
-              Output("progress-bar","value"),
+              Output("cancel-model-button",'disabled'),
             Input('run-model-status', 'modified_timestamp'),
             Input('interval-component', 'n_intervals'),
             State('run-model-status','data'),
             State('info-current-file-store','data'),
-            State('process-pid-store','data'),
-            State("progress-bar","value"),prevent_initial_call=True)
-def on_data(ts,n_intervals,data,info_current_file_store,process_pid,progress_value):
+            State("run-model-output", 'children'),
+            prevent_initial_call=True)
+def on_data(ts,n_intervals,data,info_current_file_store,model_output_children):
 
     if ts is None:
         raise PreventUpdate
 
     data = data or {}
 
-    #print("Status run model ",info_current_file["status-run-model"])
-
     if data.get('run_model',False)==False:
-        if info_current_file_store["reference_taxa"]!=None or info_current_file_store["covar_end"]!=None:
-            return info_current_file_store,html.H5("Fonction pas encore lancée"),html.H5("Truc pas encore lancé"),False,None,process_pid,progress_value
+        if info_current_file_store["reference_taxa"]!=None and info_current_file_store["covar_end"]!=None and info_current_file_store['phenotype_column']!='error':
+            return info_current_file_store,model_output_children,False,None,True
         else:
             title="At least one error in the data section, please check the errors."
-            return info_current_file_store,html.H5("Fonction pas encore lancée"),html.H5("Truc pas encore lancé"),True,title,process_pid,progress_value
+            return info_current_file_store,model_output_children,True,title,True
     
     ctx = dash.callback_context
 
@@ -455,28 +464,62 @@ def on_data(ts,n_intervals,data,info_current_file_store,process_pid,progress_val
         
         os.close(slave_fd)
         threading.Thread(target=write_output_to_file, args=(master_fd,os.path.join(info_current_file_store["session_folder"],"output_model.json"))).start()
-        #info = os.fstat(master_fd)
-        # Utilisez psutil pour obtenir le PID du processus associé
-        # print("PID Info: ",info)
-        # # while True:
-        # #     read_output(master_fd)
-        # print("Parent PID ",os.getpid())
-        # print("Pid process:",process.pid)
         info_current_file_store["status-run-model"]="in-progress"
+        info_current_file_store["process_pid"]=process.pid
+
+        if info_current_file_store["phenotype_column"]==None:
+            #Only one group
+            children=[html.H5("Inference started"),
+                      html.H5("Sampling -- chains, -- divergences"),
+                      html.Progress(id="progress-bar",className="progress-bar", value="0", max="100"),
+                      html.H5("Remaining time: --:--:--")]
+        elif info_current_file_store["phenotype_column"]!="error":
+            children=[html.H5("First inference started"),
+                      html.H5("Sampling -- chains, -- divergences"),
+                      html.Progress(id="first-progress-bar",className="progress-bar", value="0", max="100"),
+                      html.H5("Remaining time: --:--:--")]
           
         
-        return info_current_file_store,None, None,True,title,process.pid,progress_value
+        return info_current_file_store,children,True,title,False
     elif trigger == 'interval-component':
         title="You cannot run the model twice. If you want to run another simulation, open a new window. "
         #'Interval component was triggered'
-        last_output = ''
-        
+    
         json_path=os.path.join(info_current_file_store["session_folder"],"output_model.json")
         data = read_json_file(json_path)
-        percentage = data.get('percentage', 0)
-        chains = data.get('chains', 'N/A')
-        divergences = data.get('divergences', 'N/A')
-        time_remaining = data.get('time', 'N/A')
+
+        if "text" in data:
+            children=[html.H5(data["text"])]
+        elif "chains" in data:
+            percentage = data.get('percentage', '0')
+            chains = data.get('chains', '--')
+            divergences = data.get('divergences', '--')
+            time_remaining = data.get('time', '--:--:--')
+            sampling_info=f"Sampling {chains} chains, {divergences} divergences"
+
+            percentage_str=f"{percentage} %"
+
+            remaining_time=f"Remaining time: {time_remaining}"
+
+            children=[html.H5(sampling_info),
+            html.Div([html.Progress(id="progress-bar",className="progress-bar", value=str(percentage), max="100"),html.H5(percentage_str,style={'display':'inline-block','padding-left':"2%"})]),
+            html.H5(remaining_time)]
+        else:
+            print("Data null je pense: ")
+            print(data)
+            children=html.H5("I have found nothing")
+
+        # if info_current_file_store["phenotype_column"]==None:
+        #     #Only one group
+        #     children=[html.H5("Inference started"),
+        #               html.H5(sampling_info),
+        #               html.Div([html.Progress(id="progress-bar",className="progress-bar", value=str(percentage), max="100"),html.H5(percentage_str,style={'display':'inline-block','padding-left':"2%"})]),
+        #               html.H5(remaining_time)]
+        # elif info_current_file_store["phenotype_column"]!="error":
+        #     children=[html.H5("First inference started"),
+        #               html.H5(sampling_info),
+        #               html.Div([html.Progress(id="first-progress-bar",className="progress-bar", value=str(percentage), max="100"),html.H5(percentage_str,style={'display':'inline-block'})]),
+        #               html.H5(remaining_time)]
         
         if check_run_finish(info_current_file_store):
             #print("Le thread est terminé.")
@@ -485,9 +528,9 @@ def on_data(ts,n_intervals,data,info_current_file_store,process_pid,progress_val
         # else:
         #     print("Le thread est toujours en cours d'exécution...")
 
-        return info_current_file_store,html.H5("Inference started!"),last_output,True,title,process_pid,str(percentage)
+        return info_current_file_store,children,True,title,False
     else:
-        return info_current_file_store,None,None,True,None,process_pid,progress_value
+        return info_current_file_store,model_output_children,True,None,True
     
 def read_json_file(file_path):
     try:
@@ -496,31 +539,41 @@ def read_json_file(file_path):
         if data!=None:
             return data
         else:
+            print('Dans else')
             return {}
     except:
+        print("Dans except")
         return {}
     
 def write_output_to_file(fd,json_filename):
             with os.fdopen(fd, 'r') as output:
                 for line in output:
                     data=extract_info(line)
-                    with open(json_filename, 'w') as file:
-                        json.dump(data, file, indent=4)
+                    try:
+                        with open(json_filename, 'w') as file:
+                            json.dump(data, file, indent=4)
+                    except:
+                        #The file has been deleted by the other thread
+                        pass
 
 def extract_info(output):
     print("Output: ",output)
     match = re.search(
-        r"Sampling (\d+) chains, (\d+) divergences.*?(\d+)%.*?(\d+:\d+:\d+)",
+        r"Sampling (\d+) chains, (\d{1,3}(?:,\d{3})*|\d+) divergences.*?(\d+)%.*?(\d+:\d+:\d+)",
         output
     )
     if match:
+        divergences_str = match.group(2).replace(',', '')  # Delete commas if any
         return {
             "chains": int(match.group(1)),
-            "divergences": int(match.group(2)),
+            "divergences": int(divergences_str),
             "percentage": int(match.group(3)),
             "time": match.group(4)
         }
-    return None
+    else:
+        return {
+            "text":output
+        }
 
 def check_run_finish(info_current_file_store):
     if info_current_file_store["second_group"]!=None:
@@ -528,31 +581,24 @@ def check_run_finish(info_current_file_store):
     else:
         file_path=os.path.join(info_current_file_store["session_folder"],"idata.pkl")
     return os.path.exists(file_path)
-
-@app.callback(
-    Output("apriori-beta-input","value"),
-    Output("apriori-precision-matrix-input","value"),
-    Output("hyperparameters-precision-matrix", 'children',allow_duplicate=True),
-    Output("hyperparameters-beta", 'children',allow_duplicate=True),
-
-    Input("reset-values-button","n_clicks"),prevent_initial_call=True
-)
-def reset_model_values(n_clicks):
-    if n_clicks==None:
+    
+    
+@app.callback(Output("info-current-file-store","data",allow_duplicate=True),
+              Output("run-model-status","data",allow_duplicate=True),
+              Input("cancel-model-button","n_clicks"),
+              State("info-current-file-store","data"),prevent_initial_call=True)
+def kill_process(n_clicks,info_current_file_store):
+    if info_current_file_store["process_pid"]==None:
         raise PreventUpdate
-    
-    input_alpha=dcc.Input(id='alpha_ridge',type='number',placeholder='1',min=0,value=1,step='any',style=input_field_number_style,persistence=True)
-    alpha=html.Div(children=[dcc.Markdown("$\\alpha$", mathjax=True,style={"text-indent":"30px","display":"inline-block"}),input_alpha])
-    input_beta=dcc.Input(id='beta_ridge',type='number',placeholder='1',min=0,value=1,step='any',style=input_field_number_style,persistence=True)
-    beta=html.Div(children=[dcc.Markdown("$\\beta$", mathjax=True,style={"text-indent":"30px","display":"inline-block"}),input_beta])
-    
-    
-    input_lambda_init=dcc.Input(id='lambda_init_lasso',type='number',placeholder='1',min=0,value=1,step='any',style=input_field_number_style)
-    lambda_init=html.Div(children=[dcc.Markdown("$\\lambda_{init}$", mathjax=True,style={"text-indent":"30px","display":"inline-block"}),input_lambda_init])
-    
-
-    
-    return "Ridge",'Lasso',lambda_init,[alpha,beta]
-    
-    
-    
+    try:
+        pid_to_kill=info_current_file_store["process_pid"]
+        process = psutil.Process(pid_to_kill)
+        process.terminate()  # Terminer le processus
+        print(f"Cancel Button Processus avec PID {pid_to_kill} terminé avec succès.")
+        info_current_file_store["process_pid"]=None
+        info_current_file_store["status-run-model"]="not-yet"
+    except psutil.NoSuchProcess:
+        print(f"Processus avec PID {pid_to_kill} n'existe pas.")
+    except psutil.AccessDenied:
+        print(f"Accès refusé pour terminer le processus avec PID {pid_to_kill}.")
+    return info_current_file_store,{'run_model': False}

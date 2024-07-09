@@ -1,11 +1,10 @@
-import dash
 from dash import dcc, html,dash_table, callback_context
 from dash.dependencies import Input, Output, State
 import os
 import re
 import base64
+import pandas as pd
 from dash.exceptions import PreventUpdate
-import math
 
 from maindash import app, type_storage #info_current_file,
 #from ..mdine.extract_data_files import get_infos_file
@@ -72,28 +71,23 @@ def layout_data():
         # Contenu de la partie gauche
         html.Div(style={'border-bottom': '3px solid #ccc'},children=[
             # Data part
-            dcc.Store(id='upload-status', storage_type=type_storage),
+            #dcc.Store(id='upload-status', storage_type=type_storage),
         html.Div(children=[
-            dcc.Upload(
-        id='upload-data',
-        children=html.Div([
-            'Drag and Drop or ',
-            html.A('Select File')
-        ]),
-        style={
-            'width': '50%',
-            'height': '60px',
-            'lineHeight': '60px',
-            'borderWidth': '1px',
-            'borderStyle': 'dashed',
-            'borderRadius': '5px',
-            'textAlign': 'center',
-            'margin': '10px',
-            'display': 'inline-block'
-        },
-        multiple=False,
-        accept='.csv,.tsv',
-    ),
+            dcc.Upload(id='upload-data',children=html.Div(['Drag and Drop or ',html.A('Select File')]),
+            style={
+                'width': '50%',
+                'height': '60px',
+                'lineHeight': '60px',
+                'borderWidth': '1px',
+                'borderStyle': 'dashed',
+                'borderRadius': '5px',
+                'textAlign': 'center',
+                'margin': '10px',
+                'display': 'inline-block'
+            },
+            multiple=False,
+            accept='.csv,.tsv',
+        ),
     html.Div(id='output-data-upload',style={'display': 'inline-block','margin-bottom':'1em'})
         ]),
     html.Div(id='output-df-upload'),
@@ -225,23 +219,31 @@ def layout_data():
 
     ]) ## AJouté ici
 
+def find_smallest_missing_integer(lst):
+    # Convert the list to a set for O(1) look-up times
+    num_set = set(lst)
+    # Start checking from the smallest positive integer
+    i = 1
+    # Keep incrementing i until you find a missing integer
+    while i in num_set:
+        i += 1
+    return i
+
 def get_new_session_folder():
     # Path of the parent folder
     folder_parent = 'data/dash_app'
 
-    # Liste pour stocker les noms des sous-dossiers
     sub_folders = []
 
-    # Parcourir tous les éléments dans le dossier parent
     for element in os.listdir(folder_parent):
-        # Vérifier si l'élément est un dossier
         complete_path = os.path.join(folder_parent, element)
         if os.path.isdir(complete_path):
-            # Ajouter le nom du sous-dossier à la liste
             sub_folders.append(element)
 
     numbers_simulations = [int(re.search(r'\d+', nom).group()) for nom in sub_folders if re.search(r'\d+', nom)]
-    simulation_number = max(numbers_simulations)+1 if numbers_simulations else 1
+    #simulation_number = max(numbers_simulations)+1 if numbers_simulations else 1
+    simulation_number=find_smallest_missing_integer(numbers_simulations) if numbers_simulations else 1
+    print(simulation_number)
 
     folder_simulation=folder_parent+"/session_"+str(simulation_number)+"/"
     os.makedirs(folder_simulation)
@@ -251,12 +253,12 @@ def get_new_session_folder():
     
 # add a click to the appropriate store.
 @app.callback(Output("info-current-file-store","data",allow_duplicate=True),
-        Output('upload-status', 'data'),
+        #Output('upload-status', 'data'),
                 Input("upload-data", 'filename'),
                 Input('upload-data', 'contents'),
-                State('upload-status', 'data'),
+                #State('upload-status', 'data'),
                 State("info-current-file-store","data"),prevent_initial_call=True)
-def on_click(filename,contents, data,info_current_file_store):
+def on_click(filename,contents, info_current_file_store):#data,
     if filename is None:
         # prevent the None callbacks is important with the store component.
         # you don't want to update the store for nothing.
@@ -266,18 +268,15 @@ def on_click(filename,contents, data,info_current_file_store):
         
         content_type, content_string = contents.split(',')
         decoded = base64.b64decode(content_string)
-        #filename = 'uploaded_file.txt'  # Nom de fichier par défaut
-        # for content in content_type.split(';'):
-        #     print("Content: ",content)
-            # if 'filename=' in content:
-            #     filename = content.split('=')[1].strip('"')
-        # Enregistrer le fichier sur le serveur avec le même nom que celui déposé
 
         if info_current_file_store["session_folder"]==None:
             session_folder=get_new_session_folder()
         else:
             session_folder=info_current_file_store["session_folder"]
-            os.remove(info_current_file_store["filename"])
+            try:
+                os.remove(info_current_file_store["filename"])
+            except:
+                pass
             info_current_file_store["filename"]==None
 
 
@@ -285,14 +284,14 @@ def on_click(filename,contents, data,info_current_file_store):
             f.write(decoded)
 
         # Give a default data dict with 0 clicks if there's no data.
-        data = data or {'filename': filename}
+        # data = data or {'filename': filename}
 
-        data["filename"]=filename
+        # data["filename"]=filename
 
         info_current_file_store["filename"]=os.path.join(session_folder, filename)
         info_current_file_store["session_folder"]=session_folder
 
-        return info_current_file_store,data
+        return info_current_file_store#,data
 
 # output the stored clicks in the table cell.
 @app.callback(Output("output-data-upload", 'children'),
@@ -303,26 +302,36 @@ def on_click(filename,contents, data,info_current_file_store):
               Output("validate-covariate-button", 'disabled'),
               Output("interval-taxa-input", 'disabled'),
               Output("validate-taxa-button", 'disabled'),
+              Output("upload-data","disabled"),
               Output("info-current-file-store","data",allow_duplicate=True),
-                Input('upload-status', 'modified_timestamp'),
-                State('upload-status', 'data'),
-                State("info-current-file-store","data"),prevent_initial_call=True)
-def on_data(ts, data,info_current_file_store):
-    if ts is None:
-        raise PreventUpdate
+                #Input('upload-status', 'modified_timestamp'),
+                #State('upload-status', 'data'),
+                State("output-data-upload", 'children'),
+                State("output-df-upload","children"),
+                State("columns-info","children"),
+                State("rows-info","children"),
+                Input("info-current-file-store","data"),prevent_initial_call=True)
+def on_data(output_data,output_df,columns_info,rows_info,info_current_file_store): #ts, data,
+    # if ts is None:
+    #     raise PreventUpdate
 
-    data = data or {}
+    # data = data or {}
 
     #print("Data get filename: ",data.get('filename',None))
 
     if info_current_file_store["filename"]==None:
         raise PreventUpdate
+    
+    if info_current_file_store["status-run-model"]=="in-progress" or info_current_file_store["status-run-model"]=="completed":
+        #Disable changes in data view
+        return output_data,output_df,columns_info,rows_info,True,True,True,True,True,info_current_file_store
 
-    if data.get('filename',None)==None:
-        return html.Div(),html.Div(),html.Div(),html.Div(),True,True,True,True,info_current_file_store
-    else:
+    if info_current_file_store["filename"]!=None and check_df_numeric(get_df_file(info_current_file_store)):
+    #     return html.Div(),html.Div(),html.Div(),html.Div(),True,True,True,True,False,info_current_file_store
+    # else:
         #return data.get('filename', "")
-        valid_file= html.H5('File successfully downloaded : {}'.format(data.get('filename', "")),style={'display': 'inline-block'})
+        filename_base=os.path.basename(info_current_file_store["filename"])
+        valid_file= html.H5('File successfully downloaded : {}'.format(filename_base),style={'display': 'inline-block'})
         nb_rows,nb_columns=get_infos_file(info_current_file_store['filename'])
         dash_table=create_dash_table(get_df_file(info_current_file_store))
         info_current_file_store["nb_rows"]=nb_rows
@@ -330,8 +339,26 @@ def on_data(ts, data,info_current_file_store):
         infos_columns=html.H5(f"Number columns: {nb_columns}",style={"text-indent": '15px'})
         infos_rows=html.H5(f"Number rows: {nb_rows}",style={"text-indent": '15px'})
         
-        return  valid_file,dash_table,infos_columns,infos_rows,False,False,False,False,info_current_file_store
+        return  valid_file,dash_table,infos_columns,infos_rows,False,False,False,False,False,info_current_file_store
+    else:
+        filename_base=os.path.basename(info_current_file_store["filename"])
+        invalid_file= html.H5('ERROR file {} contains non-numerical values. The file must contain numbers only (except column names).'.format(filename_base),style={'display': 'inline-block','color':'red'})
+        infos_columns=html.H5(f"Number columns: ERROR file contains non-numerical values",style={"text-indent": '15px','color':'red'})
+        infos_rows=html.H5(f"Number rows: ERROR file contains non-numerical values",style={"text-indent": '15px','color':'red'})
+        os.remove(info_current_file_store["filename"])
+        info_current_file_store["filename"]=None
+        return invalid_file,None,infos_columns,infos_rows,True,True,True,True,False,info_current_file_store
     
+def check_df_numeric(df):
+    return df.map(is_numeric).all().all()
+
+def is_numeric(value):
+    try:
+        pd.to_numeric(value)
+        return True
+    except ValueError:
+        return False
+
 def create_dash_table(df):
     return html.Div([
         dash_table.DataTable(
@@ -386,21 +413,21 @@ def check_intervals(interval_cov,interval_taxa,check_ref_taxa,check_separate_dat
         start_taxa, end_taxa = map(int, match_taxa.groups())
         start_cov, end_cov = map(int, match_cov.groups())
         if start_taxa>=end_taxa or start_cov>=end_cov:
-            info_cov=html.H5("Covariates: ERROR Covariates or Taxa field is in wrong order",style={"margin-left": '30px'})
-            output_cov=html.H5("ERROR Covariates or Taxa field is in wrong order (must have start<end)")
-            info_taxa=html.H5("Taxa: ERROR Covariates or Taxa field is in wrong order",style={"margin-left": '30px'})
-            output_taxa=html.H5("ERROR Covariates or Taxa field is in wrong order (must have start<end)")
+            info_cov=html.H5("Covariates: ERROR Covariates or Taxa field is in wrong order",style={"margin-left": '30px','color': 'red'})
+            output_cov=html.H5("ERROR Covariates or Taxa field is in wrong order (must have start<end)",style={'color': 'red'})
+            info_taxa=html.H5("Taxa: ERROR Covariates or Taxa field is in wrong order",style={"margin-left": '30px','color': 'red'})
+            output_taxa=html.H5("ERROR Covariates or Taxa field is in wrong order (must have start<end)",style={'color': 'red'})
         elif max(end_cov,end_taxa)>info_current_file_store["nb_columns"]:
-            info_cov=html.H5("Covariates: ERROR Interval upper bound too large",style={"margin-left": '30px'})
-            output_cov=html.H5(f"ERROR Upper bound to large: {max(end_cov,end_taxa)} (only {info_current_file_store["nb_columns"]} number)")
-            info_taxa=html.H5("Taxa: ERROR Interval upper bound too large",style={"margin-left": '30px'})
-            output_taxa=html.H5(f"ERROR Upper bound to large: {max(end_cov,end_taxa)} (only {info_current_file_store["nb_columns"]} number)")
+            info_cov=html.H5("Covariates: ERROR Interval upper bound too large",style={"margin-left": '30px','color': 'red'})
+            output_cov=html.H5(f"ERROR Upper bound to large: {max(end_cov,end_taxa)} (only {info_current_file_store["nb_columns"]} number)",style={'color': 'red'})
+            info_taxa=html.H5("Taxa: ERROR Interval upper bound too large",style={"margin-left": '30px','color': 'red'})
+            output_taxa=html.H5(f"ERROR Upper bound to large: {max(end_cov,end_taxa)} (only {info_current_file_store["nb_columns"]} number)",style={'color': 'red'})
         elif min(end_cov,end_taxa)>=max(start_taxa,start_cov):
             # Intervals overlap
-            info_cov=html.H5("Covariates: ERROR Intervals overlap",style={"margin-left": '30px'})
-            output_cov=html.H5(f"ERROR Intervals Overlap: {min(end_cov,end_taxa)} (upper bound) and {max(start_taxa,start_cov)} (lower bound)")
-            info_taxa=html.H5("Taxa: ERROR Intervals overlap",style={"margin-left": '30px'})
-            output_taxa=html.H5(f"ERROR Intervals Overlap: {min(end_cov,end_taxa)} (upper bound) and {max(start_taxa,start_cov)} (lower bound)")
+            info_cov=html.H5("Covariates: ERROR Intervals overlap",style={"margin-left": '30px','color': 'red'})
+            output_cov=html.H5(f"ERROR Intervals Overlap: {min(end_cov,end_taxa)} (upper bound) and {max(start_taxa,start_cov)} (lower bound)",style={'color': 'red'})
+            info_taxa=html.H5("Taxa: ERROR Intervals overlap",style={"margin-left": '30px','color': 'red'})
+            output_taxa=html.H5(f"ERROR Intervals Overlap: {min(end_cov,end_taxa)} (upper bound) and {max(start_taxa,start_cov)} (lower bound)",style={'color': 'red'})
         else:
             info_current_file_store["covar_start"],info_current_file_store["covar_end"]=start_cov,end_cov
             info_current_file_store["taxa_start"],info_current_file_store["taxa_end"]=start_taxa,end_taxa
@@ -422,10 +449,10 @@ def check_intervals(interval_cov,interval_taxa,check_ref_taxa,check_separate_dat
                 values_check[3]=['checked']
     else:
         # At least one interval is empty or invalid. 
-        info_cov=html.H5(f"Covariates: ERROR Covariates or Taxa field is empty or incorrect",style={"margin-left": '30px'})
-        output_cov=html.H5("ERROR Covariates or Taxa field is empty or incorrect")
-        info_taxa=html.H5(f"Taxa: ERROR Covariates or Taxa field is empty or incorrect",style={"margin-left": '30px'})
-        output_taxa=html.H5("ERROR Covariates or Taxa field is empty or incorrect")
+        info_cov=html.H5(f"Covariates: ERROR Covariates or Taxa field is empty or incorrect",style={"margin-left": '30px','color': 'red'})
+        output_cov=html.H5("ERROR Covariates or Taxa field is empty or incorrect",style={'color': 'red'})
+        info_taxa=html.H5(f"Taxa: ERROR Covariates or Taxa field is empty or incorrect",style={"margin-left": '30px','color': 'red'})
+        output_taxa=html.H5("ERROR Covariates or Taxa field is empty or incorrect",style={'color': 'red'})
     
     return info_current_file_store,output_cov,info_cov,output_taxa,info_taxa,options_check_boxes,options_check_boxes,options_check_boxes,options_check_boxes,values_check[0],values_check[1],values_check[2],values_check[3]
         
@@ -474,6 +501,10 @@ def on_click(n_clicks_cov,n_clicks_taxa,value_cov,value_taxa,data_cov,data_taxa)
               Output("check-separate-data","value"),
               Output("check-filter-columns-zero","value"),
               Output("check-filter-deviation-mean","value"),
+              Output("reference-taxa-input","disabled"),
+              Output("phenotype-column-input","disabled"),
+              Output("filter-columns-zero-input","disabled"),
+              Output("filter-deviation-mean-input","disabled"),
                 Input('interval-covariate-status', 'modified_timestamp'),
                 Input('interval-taxa-status', 'modified_timestamp'),
                 State('interval-covariate-status', 'data'),
@@ -482,8 +513,12 @@ def on_click(n_clicks_cov,n_clicks_taxa,value_cov,value_taxa,data_cov,data_taxa)
                 State("check-separate-data","value"),
                 State("check-filter-columns-zero","value"),
                 State("check-filter-deviation-mean","value"),
-                State("info-current-file-store","data"))
-def on_data(ts_cov,ts_taxa,data_cov,data_taxa,check_ref_taxa,check_separate_data,check_filter_zeros,check_filter_dev_mean,info_current_file_store):
+                State("interval-covariate-output", 'children'),
+                State("covariates-info","children"),
+                State("interval-taxa-output", 'children'),
+                State("taxa-info","children"),
+                Input("info-current-file-store","data"))
+def on_data(ts_cov,ts_taxa,data_cov,data_taxa,check_ref_taxa,check_separate_data,check_filter_zeros,check_filter_dev_mean,children_cov,children_cov_info,children_taxa,children_taxa_info,info_current_file_store):
 
     options_check_boxes=[{'label': '', 'value': 'checked',"disabled":True}]
 
@@ -492,13 +527,16 @@ def on_data(ts_cov,ts_taxa,data_cov,data_taxa,check_ref_taxa,check_separate_data
 
     if ts_cov is None and ts_taxa is None:
         raise PreventUpdate
+    
+    if info_current_file_store["status-run-model"]=="in-progress" or info_current_file_store["status-run-model"]=="completed":
+        return info_current_file_store,children_cov,children_cov_info,children_taxa,children_taxa_info,options_check_boxes,options_check_boxes,options_check_boxes,options_check_boxes,check_ref_taxa,check_separate_data,check_filter_zeros,check_filter_dev_mean,True,True,True,True
 
     data_cov = data_cov or {}
     data_taxa=data_taxa or {}
 
     if data_cov.get('value',None)==None or data_taxa.get('value',None)==None:
         #print("Premiere option")
-        return info_current_file_store,html.Div(),html.Div(),html.Div(),html.Div(),options_check_boxes,options_check_boxes,options_check_boxes,options_check_boxes,[],[],[],[]
+        return info_current_file_store,html.Div(),html.Div(),html.Div(),html.Div(),options_check_boxes,options_check_boxes,options_check_boxes,options_check_boxes,[],[],[],[],False,False,False,False
     else:
         #print("Deuxieme option")
         # print("Liste des checks: \n")
@@ -506,7 +544,8 @@ def on_data(ts_cov,ts_taxa,data_cov,data_taxa,check_ref_taxa,check_separate_data
         # print(check_separate_data)
         # print(check_filter_zeros)
         # print(check_filter_dev_mean)
-        return check_intervals(data_cov["value"],data_taxa["value"],check_ref_taxa,check_separate_data,check_filter_zeros,check_filter_dev_mean,info_current_file_store)
+        response=check_intervals(data_cov["value"],data_taxa["value"],check_ref_taxa,check_separate_data,check_filter_zeros,check_filter_dev_mean,info_current_file_store)
+        return *response,False,False,False,False
 
 
 # @app.callback(
@@ -589,11 +628,16 @@ def update_output_taxa(value,info_current_file_store):
     else:
         message=None
         if info_current_file_store["taxa_start"]!=None:
-            ref_taxa=find_reference_taxa(info_current_file_store)
-            message=html.H5(f"Reference Taxa: {ref_taxa}",style={"text-indent": '30px'})
-            info_current_file_store["reference_taxa"]=ref_taxa
+            try:
+                ref_taxa=find_reference_taxa(info_current_file_store)
+                message=html.H5(f"Reference Taxa: {ref_taxa}",style={"text-indent": '30px'})
+                info_current_file_store["reference_taxa"]=ref_taxa
+            except:
+                message=html.H5("Reference Taxa: ERROR Enter Taxa interval",style={"text-indent": '30px',"color":"red"})
+                info_current_file_store["reference_taxa"]=None
+
         else:
-            message=html.H5("Reference Taxa: ERROR Enter Taxa interval",style={"text-indent": '30px'})
+            message=html.H5("Reference Taxa: ERROR Enter Taxa interval",style={"text-indent": '30px',"color":"red"})
             info_current_file_store["reference_taxa"]=None
         
         return info_current_file_store,{'display':'none'},None,None,None,message
@@ -747,8 +791,8 @@ def on_data(ts, data,info_current_file_store):
                 return info_current_file_store,validation_message,first_group,second_group
                     #return f"Valid interval : {start} - {end}"
             else:
-                first_group=html.H5("First Group: Error Phenotype Column isn't binary",style={"text-indent": '30px'})
-                second_group=html.H5("Second Group: Error Phenotype Column isn't binary",style={"text-indent": '30px'})
+                first_group=html.H5("First Group: Error Phenotype Column isn't binary",style={"text-indent": '30px','color':'red'})
+                second_group=html.H5("Second Group: Error Phenotype Column isn't binary",style={"text-indent": '30px','color':'red'})
                 error_message=[html.I(className="fas fa-times-circle", style={'color': 'red'}),html.H5("Error : Column is not binary.",style={'display': 'inline-block'})]
                 info_current_file_store['phenotype_column']='error'
                 info_current_file_store['first_group']='error'
@@ -882,5 +926,3 @@ def get_changes_filters(check_dev_mean,check_zeros,ts_dev_mean,ts_zeros,data_dev
         summary_filter=html.H5(f"Summary: {info_filter["remaining-taxa"]} taxa remaining",style={'display': 'inline-block',"text-indent": '15px'})
         
         return info_current_file_store,style_displayed,style_displayed,output_dev_mean,output_zeros,info_zeros,info_dev_mean,summary_filter,info_filter["taxa-init"]-info_filter["zeros-deleted"],min(filter_dev_mean,info_filter["taxa-init"]-info_filter["zeros-deleted"])
-
-

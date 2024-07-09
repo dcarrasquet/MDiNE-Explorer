@@ -6,8 +6,6 @@ cyto.load_extra_layouts()
 from dash.exceptions import PreventUpdate
 import json
 import os
-import io
-import base64
 import uuid
 import random
 import re

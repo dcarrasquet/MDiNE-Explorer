@@ -1,7 +1,6 @@
 import pymc as pm
 import pytensor.tensor
 import pytensor.tensor.shape
-from scipy.special import softmax
 import pytensor
 import pytensor.tensor as pt
 import pymc.math
@@ -9,13 +8,10 @@ import pickle
 import math
 import numpy as np
 from pytensor.tensor.linalg import inv as matrix_inverse
-#import scipy.stats
 import json
 import re
 import os
 
-import arviz as az
-import matplotlib.pyplot as plt
 
 import pandas as pd
 

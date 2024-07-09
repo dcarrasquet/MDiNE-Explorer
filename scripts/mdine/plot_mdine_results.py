@@ -3,8 +3,6 @@ import arviz as az
 import matplotlib.pyplot as plt
 import numpy as np
 import math
-import networkx as nx
-from matplotlib.widgets import Slider
 import json
 from scipy.stats import gamma, norm
 from scipy.stats import gaussian_kde

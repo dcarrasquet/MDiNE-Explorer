@@ -1,7 +1,12 @@
 from maindash import app,type_storage
 #from views.main_view import make_layout
 
-import dash
+import time
+#import threading
+import flask
+import psutil
+import os
+import shutil
 from dash import dcc, html
 from dash.dependencies import Input, Output, State
 # import plotly.express as px
@@ -85,6 +90,9 @@ completed=False
 
 if completed==False:
     initial_info_current_file={
+    "monitor_thread_launched_pid":False,
+    "monitor_thread_launched_folder":False,
+    "process_pid": None,
     'filename':None,
     'session_folder':None,
     'nb_rows':None,
@@ -118,6 +126,7 @@ if completed==False:
 }
 else:
     initial_info_current_file={
+        "monitor_thread_launched":False,
         'filename':"data/dash_app/session_1/crohns-numeric-tsv.tsv",
         'session_folder':"data/dash_app/session_1/",
         'nb_rows':100,
@@ -151,7 +160,19 @@ else:
     }
 
 def make_layout():
+    path_data="data/dash_app"
+    if not os.path.exists(path_data):
+        try:
+            # Créer le dossier et ses parents si nécessaire
+            os.makedirs(path_data)
+            print(f"Le dossier '{path_data}' a été créé avec succès.")
+        except OSError as e:
+            print(f"Erreur : Impossible de créer le dossier '{path_data}' : {e.strerror}")
+
     return html.Div(children=[
+        dcc.Interval(id='check-deconnection',interval=5*1000,n_intervals=0),
+        dcc.Location(id='location'),
+        html.Div(id="useless-component"),
         html.Div(style={"padding-bottom": "10vh"},children=[
         # Barre de navigation
         html.Nav(style=nav_style, className="navbar", children=[
@@ -211,7 +232,7 @@ def render_content(ts,tab,info_current_file_store):
     elif tab == 'tab-data':
         return display_none,None,display_none,display_none,None,None,None
     elif tab == 'tab-model':
-        if info_current_file_store["reference_taxa"]!=None and info_current_file_store["covar_end"]!=None and info_current_file_store["status-run-model"]=='not-yet':
+        if info_current_file_store["reference_taxa"]!=None and info_current_file_store["covar_end"]!=None and info_current_file_store["status-run-model"]=='not-yet' and info_current_file_store['phenotype_column']!='error':
             return display_none,display_none,None,display_none,None,False,None
         else:
             #At leat one error in the data section
@@ -222,6 +243,103 @@ def render_content(ts,tab,info_current_file_store):
     elif tab == 'tab-export':
         return display_none,display_none,display_none,display_none,layout_export_results(info_current_file_store),None,None
 
+@app.callback(Output('info-current-file-store','data',allow_duplicate=True),
+              Input('check-deconnection','n_intervals'),
+              State('info-current-file-store','data'),prevent_initial_call=True)
+def register_connection(n_intervals,info_current_file_store):
+    if info_current_file_store["session_folder"]!=None:
+        txt_file=os.path.join(info_current_file_store["session_folder"],"time.txt")
+        with open(txt_file, 'w') as f:
+            f.write(f'{time.time()}\n')
+
+        # if info_current_file_store["monitor_thread_launched_folder"]==False:
+        #     print(f"Thread folder lauched {txt_file}")
+        #     threading.Thread(target=monitor_disconnection,args=(info_current_file_store["session_folder"],info_current_file_store["process_pid"],"delete_folder",), daemon=True).start()
+        #     info_current_file_store["monitor_thread_launched_folder"]=True
+
+        # if info_current_file_store["monitor_thread_launched_pid"]==False and info_current_file_store["process_pid"]!=None and info_current_file_store["status-run-model"]=="in-progress":
+        #     print(f"Thread pid lauched {txt_file}")
+        #     threading.Thread(target=monitor_disconnection,args=(info_current_file_store["session_folder"],info_current_file_store["process_pid"],"kill_process",), daemon=True).start()
+        #     info_current_file_store["monitor_thread_launched_pid"]=True
+    
+    return info_current_file_store
+
+def monitor_disconnection(session_folder,pid_to_kill,type_action):
+    txt_file=os.path.join(session_folder,"time.txt")
+    while True:
+        time.sleep(10)  # Vérifie toutes les 10 secondes
+        try:
+            with open(txt_file, 'r') as f:
+                timestamps = f.readlines()
+                if timestamps:
+                    last_time=float(timestamps[-1].strip())
+                    #print("Diff time:",time.time()-last_time)
+        except FileNotFoundError:
+            last_time=0
+        if time.time() - last_time > 10:
+            print(f"L'utilisateur a probablement fermé la page {txt_file}")
+
+            if type_action=="kill_process":
+                print("Je veux du kill")
+                try:
+                    process = psutil.Process(pid_to_kill)
+                    process.terminate()  # Terminer le processus
+                    print(f"Processus avec PID {pid_to_kill} terminé avec succès.")
+                except psutil.NoSuchProcess:
+                    print(f"Processus avec PID {pid_to_kill} n'existe pas.")
+                except psutil.AccessDenied:
+                    print(f"Accès refusé pour terminer le processus avec PID {pid_to_kill}.")
+
+            # Delete user folder
+            elif type_action=="delete_folder":
+                try:
+                    # Suppression du dossier et de son contenu récursivement
+                    shutil.rmtree(session_folder)
+                    print(f"Le dossier '{session_folder}' a été supprimé avec succès.")
+                except OSError as e:
+                    print(f"Erreur : {session_folder} : {e.strerror}")
+            else:
+                raise ValueError
+
+            break
+
+@app.server.route('/close-session', methods=['POST'])
+def close_session():
+    data = flask.request.json  # Data sent from JavaScript fetch
+    #session_data = flask.request.environ.get('werkzeug.request').json['session-store']['data']
+    #print(f"Session data: {data}")
+    session_folder=data["session_folder"]
+    pid_to_kill=data["process_pid"]
+    if session_folder!=None:
+        #print("Session folder: ",session_folder)
+        txt_file=os.path.join(session_folder,"time.txt")
+        time.sleep(30)
+        with open(txt_file, 'r') as f:
+            timestamps = f.readlines()
+            if timestamps:
+                last_time=float(timestamps[-1].strip())
+                print("Diff time111111:",time.time()-last_time)
+                if time.time()-last_time>=20:
+                    #Delete and stop everything related to the user session
+                    print(f"L'utilisateur a probablement fermé la page {txt_file}")
+                    if pid_to_kill!=None:
+                        try:
+                            process = psutil.Process(pid_to_kill)
+                            process.terminate()  # Terminer le processus
+                            print(f"Processus avec PID {pid_to_kill} terminé avec succès.")
+                        except psutil.NoSuchProcess:
+                            print(f"Processus avec PID {pid_to_kill} n'existe pas.")
+                        except psutil.AccessDenied:
+                            print(f"Accès refusé pour terminer le processus avec PID {pid_to_kill}.")
+
+                    try:
+                        # Suppression du dossier et de son contenu récursivement
+                        shutil.rmtree(session_folder)
+                        print(f"Le dossier '{session_folder}' a été supprimé avec succès.")
+                    except OSError as e:
+                        print(f"Erreur : {session_folder} : {e.strerror}")
+    
+    return flask.jsonify({"status": "success"}), 200
 
 if __name__=="__main__":
     app.layout=make_layout()
