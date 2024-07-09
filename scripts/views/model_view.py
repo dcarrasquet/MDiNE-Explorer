@@ -557,7 +557,6 @@ def write_output_to_file(fd,json_filename):
                         pass
 
 def extract_info(output):
-    print("Output: ",output)
     match = re.search(
         r"Sampling (\d+) chains, (\d{1,3}(?:,\d{3})*|\d+) divergences.*?(\d+)%.*?(\d+:\d+:\d+)",
         output
@@ -594,7 +593,7 @@ def kill_process(n_clicks,info_current_file_store):
         pid_to_kill=info_current_file_store["process_pid"]
         process = psutil.Process(pid_to_kill)
         process.terminate()  # Terminer le processus
-        print(f"Cancel Button Processus avec PID {pid_to_kill} terminé avec succès.")
+        #print(f"Cancel Button Processus avec PID {pid_to_kill} terminé avec succès.")
         info_current_file_store["process_pid"]=None
         info_current_file_store["status-run-model"]="not-yet"
     except psutil.NoSuchProcess:
