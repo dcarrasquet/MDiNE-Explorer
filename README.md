@@ -1,4 +1,4 @@
-# mdine_python
- Transposition of the R MDiNE package into Python and creation of a graphical interface for it. 
+# iMDiNE
+ iMDiNE is a Python application permitting the interactive analysis of differential co-occurrence networks of species.
 
  
