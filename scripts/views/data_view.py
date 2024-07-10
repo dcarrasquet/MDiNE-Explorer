@@ -310,10 +310,11 @@ def on_click(filename,contents, info_current_file_store):#data,
                 State("output-df-upload","children"),
                 State("columns-info","children"),
                 State("rows-info","children"),
-                Input("info-current-file-store","data"),prevent_initial_call=True)
-def on_data(output_data,output_df,columns_info,rows_info,info_current_file_store): #ts, data,
-    # if ts is None:
-    #     raise PreventUpdate
+                Input("info-current-file-store","modified_timestamp"),
+                State("info-current-file-store","data"),prevent_initial_call=True)
+def on_data(output_data,output_df,columns_info,rows_info,ts,info_current_file_store): #ts, data,
+    if ts is None:
+        raise PreventUpdate
 
     # data = data or {}
 
@@ -517,8 +518,9 @@ def on_click(n_clicks_cov,n_clicks_taxa,value_cov,value_taxa,data_cov,data_taxa)
                 State("covariates-info","children"),
                 State("interval-taxa-output", 'children'),
                 State("taxa-info","children"),
-                Input("info-current-file-store","data"))
-def on_data(ts_cov,ts_taxa,data_cov,data_taxa,check_ref_taxa,check_separate_data,check_filter_zeros,check_filter_dev_mean,children_cov,children_cov_info,children_taxa,children_taxa_info,info_current_file_store):
+                Input("info-current-file-store","modified_timestamp"),
+                State("info-current-file-store","data"))
+def on_data(ts_cov,ts_taxa,data_cov,data_taxa,check_ref_taxa,check_separate_data,check_filter_zeros,check_filter_dev_mean,children_cov,children_cov_info,children_taxa,children_taxa_info,ts_info_store,info_current_file_store):
 
     options_check_boxes=[{'label': '', 'value': 'checked',"disabled":True}]
 

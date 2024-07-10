@@ -15,9 +15,6 @@ import subprocess
 
 from maindash import app,type_storage
 
-# from mdine.MDiNE_model import run_model
-# from mdine.extract_data_files import get_separate_data
-
 button_hover_style = {
     'background': '#4A90E2'
 }
@@ -458,10 +455,14 @@ def on_data(ts,n_intervals,data,info_current_file_store,model_output_children):
         title="You cannot run the model twice. If you want to run another simulation, open a new window. "
         
         master_fd, slave_fd = pty.openpty()
-        cmd=[sys.executable, 'scripts/mdine/MDiNE_model.py',json.dumps(info_current_file_store)]
+        #cmd=[sys.executable, '/app/scripts/mdine/MDiNE_model.py',json.dumps(info_current_file_store)] #Docker
+        cmd=[sys.executable, 'scripts/mdine/MDiNE_model.py',json.dumps(info_current_file_store)]#Github
 
+        
         process = subprocess.Popen(cmd, stdin=slave_fd, stdout=slave_fd, stderr=slave_fd,text=True, close_fds=True)
         
+
+        print("File path: ",os.path.join(info_current_file_store["session_folder"],"output_model.json"))
         os.close(slave_fd)
         threading.Thread(target=write_output_to_file, args=(master_fd,os.path.join(info_current_file_store["session_folder"],"output_model.json"))).start()
         info_current_file_store["status-run-model"]="in-progress"

@@ -13,7 +13,7 @@ import scipy.special
 import scipy.stats
 import os
 import math
-import seaborn as sns
+#import seaborn as sns
 import re
 import json
 
@@ -276,7 +276,7 @@ def generate_counts_data_ZINB(n_individus,k_covariables,j_taxa,folder):
 	# for i in range (n_individus):
 	# 	W_matrix[i]=scipy.stats.multivariate_normal.rvs(0,cov=correlation_matrix,size=(n_individus,j_taxa))
 		
-	ax = sns.heatmap(correlation_matrix, linewidth=0.5)
+	#ax = sns.heatmap(correlation_matrix, linewidth=0.5)
 	plt.show()
 
 def generate_counts_data_Multinomial(n_individus,k_covariables,j_taxa,folder):

@@ -11,9 +11,9 @@ import random
 import re
 #import dash_mantine_components as dmc
 
-import matplotlib
-import matplotlib.pyplot as plt
-matplotlib.use('Agg')
+# import matplotlib
+# import matplotlib.pyplot as plt
+# matplotlib.use('Agg')
 
 from maindash import app, type_storage #info_current_file
 from mdine.plot_mdine_results import get_elements_co_occurence_network,get_stylesheet_co_occurrence_network,get_stylesheet_diff_network, get_energy_figure,get_acceptance_rate,get_trace_beta,get_trace_precision_matrix

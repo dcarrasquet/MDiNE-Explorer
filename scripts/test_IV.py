@@ -13,10 +13,10 @@ with pm.Model() as gamma_model:
     y = pm.Gamma("y", alpha, beta, observed=gamma_data)
 
 with gamma_model:
-    mean_field = pm.fit()
-    #mean_field = pm.fit(obj_optimizer=pm.adagrad_window(learning_rate=1e-2))
+    #mean_field = pm.fit()
+    mean_field = pm.fit(obj_optimizer=pm.adagrad_window(learning_rate=1e-2))
 
-plt.plot(mean_field.hist)
+#plt.plot(mean_field.hist)
 
 with gamma_model:
     trace = pm.sample()

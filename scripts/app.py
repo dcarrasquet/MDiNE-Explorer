@@ -196,6 +196,9 @@ def make_layout():
         html.Div(id='div-data',style={'display':'none'},children=[layout_data()]),
         html.Div(id='div-model',style={'display':'none'},children=[layout_model()]),
         html.Div(id='div-visu',style={'display':'none'},children=[layout_visualization()]),
+        # html.Div(id='div-data',style={'display':'none'}),
+        # html.Div(id='div-model',style={'display':'none'}),
+        # html.Div(id='div-visu',style={'display':'none'}),
         #html.Div(id='div-export',style={'display':'none'},children=[layout_export_results()]),
         html.Div(id='div-export')
         ])
@@ -242,6 +245,8 @@ def render_content(ts,tab,info_current_file_store):
         return display_none,display_none,display_none,None,None,None,None
     elif tab == 'tab-export':
         return display_none,display_none,display_none,display_none,layout_export_results(info_current_file_store),None,None
+    
+
 
 @app.callback(Output('info-current-file-store','data',allow_duplicate=True),
               Input('check-deconnection','n_intervals'),
@@ -343,4 +348,5 @@ def close_session():
 
 if __name__=="__main__":
     app.layout=make_layout()
-    app.run(host='127.0.0.1',port=8080,debug=True)
+    #app.run(host='0.0.0.0',port=8080,debug=True)
+    app.run(host='0.0.0.0',port=8080,debug=True)
