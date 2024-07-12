@@ -8,7 +8,7 @@ external_stylesheets = ['https://cdnjs.cloudflare.com/ajax/libs/bulma/0.9.3/css/
 
 app = dash.Dash(__name__,external_stylesheets=external_stylesheets,suppress_callback_exceptions=True)
 
-app.title = "MDiNE web app"
+app.title = "iMDiNE"
 #type_storage="memory"
 type_storage="session"
 

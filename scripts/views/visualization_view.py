@@ -11,9 +11,9 @@ import random
 import re
 #import dash_mantine_components as dmc
 
-# import matplotlib
-# import matplotlib.pyplot as plt
-# matplotlib.use('Agg')
+import matplotlib
+import matplotlib.pyplot as plt
+matplotlib.use('Agg')
 
 from maindash import app, type_storage #info_current_file
 from mdine.plot_mdine_results import get_elements_co_occurence_network,get_stylesheet_co_occurrence_network,get_stylesheet_diff_network, get_energy_figure,get_acceptance_rate,get_trace_beta,get_trace_precision_matrix
@@ -195,7 +195,8 @@ def layout_co_occurence_networks(legend_store,info_current_file_store):
                     stylesheet=stylesheet,
                     #autoRefreshLayout=True,
                     style={'width': '90%','height':'50vh','backgroundColor': '#f0f0f0','margin': '0 auto'},
-                    layout={'name': 'concentric'} #cose #concentric
+                    #layout={'name': 'concentric'} #cose #concentric
+                    layout={'name': 'preset'}
                     
                 ),
                 
@@ -686,6 +687,8 @@ def output_dropdown(list_graphs,info_current_file_store):
     State('legend-store','data')
 )
 def display_selected_nodes(n_clicks,data,data_legend_store):
+
+    print("Selected data nodes: ",data)
 
     if n_clicks==None:
         raise PreventUpdate

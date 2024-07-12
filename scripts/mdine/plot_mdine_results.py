@@ -1,6 +1,6 @@
 import pickle
 import arviz as az
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 import numpy as np
 import math
 import json
@@ -8,6 +8,10 @@ from scipy.stats import gamma, norm
 from scipy.stats import gaussian_kde
 
 import plotly.graph_objects as go
+
+import matplotlib
+import matplotlib.pyplot as plt
+matplotlib.use('Agg')
 
 
 #from extract_data_files import get_species_list, separate_data_in_two_groups, get_data
@@ -535,10 +539,19 @@ def get_elements_co_occurence_network(df_taxa,legend_store):
         
     #     elements.append({'data': {'id': str(taxa), 'label': str(taxa)},'position': {'x': 0, 'y': 0}})
 
+    nb_species=len(taxa_list)
 
-    for i in range (len(taxa_list)):
+    ## Construction of the circular layout
+    x_circle=700
+    y_circle=250
+    radius=200
+
+
+    for i in range (nb_species):
         #elements.append({'data': {'id': str(taxa_list[i]), 'label': str(taxa_list[i])},'position': {'x': 0, 'y': 0}})
-        elements.append({'data': {'id': str(taxa_list[i]), 'label': str(taxa_list[i])}})
+        x=x_circle+radius*math.cos(2*math.pi*i/nb_species)
+        y=y_circle+radius*math.sin(2*math.pi*i/nb_species)
+        elements.append({'data': {'id': str(taxa_list[i]), 'label': str(taxa_list[i])},'position': {'x':x,'y':y}})
         for j in range (i):
             elements.append({'data': {'source': taxa_list[i], 'target': taxa_list[j]}})
 
