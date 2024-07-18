@@ -12,10 +12,11 @@ from maindash import app, type_storage #info_current_file,
 from mdine.extract_data_files import (
     get_infos_file,
     get_df_file,
-    check_phenotype_column,
     get_info_separate_groups,
     get_df_taxa,
-    find_reference_taxa)
+    find_reference_taxa,
+    get_list_taxa,
+    get_list_binary_covariates)
 
 #data_path="data/test_app/"
 
@@ -112,7 +113,7 @@ def layout_data():
     ]),
 
     html.Div(children=[
-        html.H5("Presence of a reference taxa",style={'display': 'inline-block','margin-right': '10px','margin-top':'1em'}),
+        html.H5("Presence of a reference taxa",style={'display': 'inline-block','margin-right': '10px','margin-top':'1em','margin-bottom':'1em'}),
         dcc.Checklist(options=[{'label': '', 'value': 'checked',"disabled":True}],value=[],id='check-ref-taxa',persistence=True,persistence_type=type_storage,style={'display': 'inline-block'}),
         html.Span("i", id="info-icon-ref-taxa", title='''The reference taxa is a species with a low deviation/mean ratio. It will not be plotted on the final network. If no species is given by the user, the species with the lowest ratio will be chosen by default.''',
               style={'display': 'inline-block', 'marginLeft': '10px',
@@ -120,11 +121,26 @@ def layout_data():
                      'backgroundColor': '#007BFF', 'color': 'white', 'textAlign': 'center',
                      'lineHeight': '20px', 'cursor': 'pointer'}),
         html.Div(id='select-ref-taxa',style={'display':'none'},children=[
-          html.H5("Reference taxa column ",style={"text-indent": '30px','display': 'inline-block'}),
-    dcc.Store(id='reference-taxa-status', storage_type=type_storage),
-    dcc.Input(id='reference-taxa-input',type='number',persistence=True,persistence_type=type_storage,style=input_field_number_style),
-    #,min=info_current_file_store['taxa_start'],max=info_current_file_store['taxa_end'],step=1,value=info_current_file_store['taxa_end'],
-    html.Div(id='reference-taxa-output',style={'display':'inline-block'}),
+            html.Div(
+            style={'display': 'flex', 'align-items': 'center'},  # Utilisation de flexbox pour aligner les éléments
+            children=[
+                html.H5(
+                    "Reference taxa",
+                    style={'text-indent':'30px','margin-right': '10px','flex-shrink': 0}  # Petit espace entre le texte et le dropdown
+                ),
+                html.Div(children=[dcc.Dropdown(
+                    id='reference-taxa-dropdown',
+                    clearable=False,
+                    persistence=True,
+                    persistence_type=type_storage
+                )],
+                style={'width': '50%'}),
+            ]
+        ),
+        dcc.Store(id='reference-taxa-status', storage_type=type_storage),
+    #       html.H5("Reference taxa",style={"text-indent": '30px','display': 'inline-block'}),
+    # dcc.Store(id='reference-taxa-status', storage_type=type_storage),
+    # dcc.Dropdown(id='reference-taxa-dropdown',clearable=False,persistence=True,persistence_type=type_storage,style={'display': 'inline-block','width': '50%', 'margin': '20px 0'}),
     
         ]),
     ]),
@@ -132,16 +148,40 @@ def layout_data():
     html.Div(children=[
         html.H5("Separate data in two groups",style={'display': 'inline-block','margin-right': '10px','margin-top':'1em','margin-bottom':'1em'}),
         dcc.Checklist(options=[{'label': '', 'value': 'checked',"disabled":True}],value=[],id='check-separate-data',persistence=True,persistence_type=type_storage,style={'display': 'inline-block'}),
-        #html.Div(id='select-separate-data'),
-        html.Div(id='select-separate-data',style={'display': 'none','vertical-align': 'middle'},children=[
-            #style={'display': 'inline-block','vertical-align': 'middle'}
-            html.H5("Phenotype column ",style={"text-indent": '30px','display': 'inline-block'}),
-            dcc.Store(id='phenotype-column-status', storage_type=type_storage),
-            dcc.Input(id='phenotype-column-input',type='number',persistence=True,persistence_type=type_storage,style=input_field_number_style),
-            #min=info_current_file_store['covar_start'],max=info_current_file_store['covar_end'],step=1,value=info_current_file_store['covar_start']
-            html.Div(id='phenotype-column-output',style={'display': 'inline-block'}),
+        html.Span("i", id="info-icon-separate-data", title='''If you want to separate your data in two groups, the phenotype column must contain only 0 and 1. If not it raises an error. ''',
+              style={'display': 'inline-block', 'marginLeft': '10px',
+                     'width': '20px', 'height': '20px', 'borderRadius': '50%',
+                     'backgroundColor': '#007BFF', 'color': 'white', 'textAlign': 'center',
+                     'lineHeight': '20px', 'cursor': 'pointer'}),
+        html.Div(id='select-separate-data',style={'display':'none'},children=[
+            html.Div(
+            style={'display': 'flex', 'align-items': 'center','margin-bottom':'1em'},
+            children=[
+                html.H5(
+                    "Phenotype column",
+                    style={'text-indent':'30px','margin-right': '10px','flex-shrink': 0}
+                ),
+                html.Div(children=[dcc.Dropdown(
+                    id='phenotype-column-dropdown',
+                    clearable=False,
+                    persistence=True,
+                    persistence_type=type_storage
+                )],
+                style={'width': '50%'}),
+            ]
+        ),
+        dcc.Store(id='phenotype-column-status', storage_type=type_storage)]),
+        
 
-        ]),
+        # html.Div(id='select-separate-data',style={'display': 'none','vertical-align': 'middle'},children=[
+        #     #style={'display': 'inline-block','vertical-align': 'middle'}
+        #     html.H5("Phenotype column ",style={"text-indent": '30px','display': 'inline-block'}),
+        #     dcc.Store(id='phenotype-column-status', storage_type=type_storage),
+        #     dcc.Input(id='phenotype-column-input',type='number',persistence=True,persistence_type=type_storage,style=input_field_number_style),
+        #     #min=info_current_file_store['covar_start'],max=info_current_file_store['covar_end'],step=1,value=info_current_file_store['covar_start']
+        #     html.Div(id='phenotype-column-output',style={'display': 'inline-block'}),
+
+        # ]),
     ])
     ]),
 
@@ -217,8 +257,7 @@ def layout_data():
     html.Div(style={'clear': 'both', 'borderLeft': '1px solid #ccc'}),
 ])
 
-    ]) ## AJouté ici
-
+    ])
 def find_smallest_missing_integer(lst):
     # Convert the list to a set for O(1) look-up times
     num_set = set(lst)
@@ -283,11 +322,6 @@ def on_click(filename,contents, info_current_file_store):#data,
         with open(os.path.join(session_folder, filename), 'wb') as f:
             f.write(decoded)
 
-        # Give a default data dict with 0 clicks if there's no data.
-        # data = data or {'filename': filename}
-
-        # data["filename"]=filename
-
         info_current_file_store["filename"]=os.path.join(session_folder, filename)
         info_current_file_store["session_folder"]=session_folder
 
@@ -315,7 +349,10 @@ def on_click(filename,contents, info_current_file_store):#data,
 def on_data(output_data,output_df,columns_info,rows_info,ts,info_current_file_store): #ts, data,
     if ts is None:
         raise PreventUpdate
+    
+    print('Je suis appelé en boucke')
 
+    #print('Info current afer reuplod: ',info_current_file_store)
     # data = data or {}
 
     #print("Data get filename: ",data.get('filename',None))
@@ -358,6 +395,7 @@ def is_numeric(value):
         pd.to_numeric(value)
         return True
     except ValueError:
+        print("Error value: ",value)
         return False
 
 def create_dash_table(df):
@@ -381,16 +419,6 @@ def create_dash_table(df):
         ),
         html.Hr()  # horizontal line
     ],style={'width':"90%",'margin-left': 'auto','margin-right': 'auto'})
-
-
-
-# @app.callback(Output("interval-covariate-output", 'children'),
-#               Output("covariates-info","children"),
-#               Output("interval-taxa-output", 'children'),
-#               Output("taxa-info","children"),
-#               Output("check-ref-taxa","options"),
-#               Output("check-separate-data","options"),
-
 
 def check_intervals(interval_cov,interval_taxa,check_ref_taxa,check_separate_data,check_filter_zeros,check_filter_dev_mean,info_current_file_store):
 
@@ -489,7 +517,7 @@ def on_click(n_clicks_cov,n_clicks_taxa,value_cov,value_taxa,data_cov,data_taxa)
     return data_cov,data_taxa
 
 # output the stored clicks in the table cell.
-@app.callback(Output("info-current-file-store","data"),
+@app.callback(Output("info-current-file-store","data",allow_duplicate=True),
               Output("interval-covariate-output", 'children'),
               Output("covariates-info","children"),
               Output("interval-taxa-output", 'children'),
@@ -502,8 +530,8 @@ def on_click(n_clicks_cov,n_clicks_taxa,value_cov,value_taxa,data_cov,data_taxa)
               Output("check-separate-data","value"),
               Output("check-filter-columns-zero","value"),
               Output("check-filter-deviation-mean","value"),
-              Output("reference-taxa-input","disabled"),
-              Output("phenotype-column-input","disabled"),
+              Output("reference-taxa-dropdown","disabled"),
+              Output("phenotype-column-dropdown","disabled"),
               Output("filter-columns-zero-input","disabled"),
               Output("filter-deviation-mean-input","disabled"),
                 Input('interval-covariate-status', 'modified_timestamp'),
@@ -519,7 +547,7 @@ def on_click(n_clicks_cov,n_clicks_taxa,value_cov,value_taxa,data_cov,data_taxa)
                 State("interval-taxa-output", 'children'),
                 State("taxa-info","children"),
                 Input("info-current-file-store","modified_timestamp"),
-                State("info-current-file-store","data"))
+                State("info-current-file-store","data"),prevent_initial_call=True)
 def on_data(ts_cov,ts_taxa,data_cov,data_taxa,check_ref_taxa,check_separate_data,check_filter_zeros,check_filter_dev_mean,children_cov,children_cov_info,children_taxa,children_taxa_info,ts_info_store,info_current_file_store):
 
     options_check_boxes=[{'label': '', 'value': 'checked',"disabled":True}]
@@ -548,92 +576,47 @@ def on_data(ts_cov,ts_taxa,data_cov,data_taxa,check_ref_taxa,check_separate_data
         # print(check_filter_dev_mean)
         response=check_intervals(data_cov["value"],data_taxa["value"],check_ref_taxa,check_separate_data,check_filter_zeros,check_filter_dev_mean,info_current_file_store)
         return *response,False,False,False,False
+    
 
 
-# @app.callback(
-#         Output('all-checks-status','data'),
-#         Input('check-ref-taxa','value'),
-#         Input('check-separate-data','value'),
-#         Input("check-filter-deviation-mean","value"),
-#         Input("check-filter-columns-zero","value"),
-#         State('all-checks-status','data'),
-# )
-# def on_data(taxa,separate_data,filter_dev_mean,filter_zeros,data):
-#     default_data={'ref-taxa':[],
-#                   'separate-data':[],
-#                   'filter-dev-mean':[],
-#                   'filter-zeros':[]}
-#     data['ref-taxa']=taxa
+###### Reference Taxa column #######
 
-#     data=data or default_data
-
-def on_click(n_clicks_cov,n_clicks_taxa,value_cov,value_taxa,data_cov,data_taxa):
-    if n_clicks_cov==None and n_clicks_taxa==None and value_cov==None and value_taxa==None:
-        # prevent the None callbacks is important with the store component.
-        # you don't want to update the store for nothing.
+#### Update reference-taxa-status ####
+@app.callback(Output('reference-taxa-status', 'data'),
+                Input("reference-taxa-dropdown","value"),
+                State('reference-taxa-status', 'data'))
+def on_click(value, data):
+    if value is None:
         raise PreventUpdate
 
-    
-    data_cov = data_cov or {'value': ""}
-    data_taxa = data_taxa or {'value': ""}
-    
-    if value_cov!=None:
-        data_cov["value"]=value_cov
-    if value_taxa!=None:
-        data_taxa["value"]=value_taxa
+    return value
 
-    return data_cov,data_taxa
 
-###### Select Taxa and groups ######
-
-# @app.callback(
-#     Output('select-ref-taxa', 'children'),
-#     Output('taxa-reference-info','children',allow_duplicate=True),
-#     [Input('check-ref-taxa', 'value')],
-#     State("info-current-file-store","data"),prevent_initial_call='initial_duplicate'
-# )
-# def update_output_taxa(value,info_current_file_store):
-#     if len(value)!=0:
-#         return html.Div(style={'display': 'inline-block','vertical-align': 'middle'},children=[
-#           html.H5("Reference taxa column ",style={"text-indent": '30px','display': 'inline-block'}),
-#     dcc.Store(id='reference-taxa-status', storage_type=type_storage),
-#     dcc.Input(id='reference-taxa-input',type='number',min=info_current_file_store['taxa_start'],max=info_current_file_store['taxa_end'],step=1,value=info_current_file_store['taxa_end'],persistence=True,persistence_type=type_storage,style=input_field_number_style),
-#     #dcc.Input(id='reference-taxa-input', type='text', placeholder='ex: 124',persistence=True,persistence_type=type_storage,style=input_field_style),
-#     #html.Button('Confirm', id='reference-taxa-button', n_clicks=0,style=button_style),
-#     html.Div(id='reference-taxa-output',style={'display':'inline-block'}),
-#     ]), None
-#     else:
-#         if info_current_file_store["taxa_start"]!=None:
-#             message=html.H5(f"Reference Taxa: {find_reference_taxa(info_current_file_store)}",style={"text-indent": '30px'})
-#             return None,message
-#         else:
-#             return None, html.H5("Reference Taxa: Error Enter Taxa interval",style={"text-indent": '30px'})
-
+#### Update all components related to Reference Taxa ####
 @app.callback(
-    Output("info-current-file-store","data",allow_duplicate=True),
-    Output('select-ref-taxa', 'style'),
-    Output('reference-taxa-input', 'min'),
-    Output('reference-taxa-input', 'max'),
-    Output('reference-taxa-input', 'value'),
-    Output('taxa-reference-info','children',allow_duplicate=True),
-    [Input('check-ref-taxa', 'value')],
-    State("info-current-file-store","data"),prevent_initial_call='initial_duplicate'
-)
-def update_output_taxa(value,info_current_file_store):
-    if len(value)!=0:
-        min=info_current_file_store['taxa_start']
-        max=info_current_file_store['taxa_end']
-        value=info_current_file_store['taxa_end']
-        ref_taxa=find_reference_taxa(info_current_file_store,value)
-        message=html.H5(f"Reference Taxa: {ref_taxa}",style={"text-indent": '30px'})
-        return info_current_file_store,None,min,max,value,message
-    else:
+        Output("info-current-file-store","data",allow_duplicate=True),
+        Output('select-ref-taxa', 'style'),
+        Output('reference-taxa-dropdown', 'options'),
+        Output('reference-taxa-dropdown', 'value'),
+        Output("taxa-reference-info", 'children',allow_duplicate=True),
+        Input('check-ref-taxa', 'value'),
+        Input('reference-taxa-status', 'modified_timestamp'),
+        State('reference-taxa-status', 'data'),
+        State("info-current-file-store","data"),prevent_initial_call=True)
+def update_dropdown_ref_taxa(value_check,ts_ref_taxa,value_ref_taxa,info_current_file_store):
+
+    if len(value_check)==0:
+        ## Not Checked
         message=None
+        options=[]
+        value_dropdown=None
         if info_current_file_store["taxa_start"]!=None:
             try:
                 ref_taxa=find_reference_taxa(info_current_file_store)
                 message=html.H5(f"Reference Taxa: {ref_taxa}",style={"text-indent": '30px'})
                 info_current_file_store["reference_taxa"]=ref_taxa
+                options={'label':ref_taxa,'value':ref_taxa}
+                value_dropdown=ref_taxa
             except:
                 message=html.H5("Reference Taxa: ERROR Enter Taxa interval",style={"text-indent": '30px',"color":"red"})
                 info_current_file_store["reference_taxa"]=None
@@ -642,164 +625,173 @@ def update_output_taxa(value,info_current_file_store):
             message=html.H5("Reference Taxa: ERROR Enter Taxa interval",style={"text-indent": '30px',"color":"red"})
             info_current_file_store["reference_taxa"]=None
         
-        return info_current_file_store,{'display':'none'},None,None,None,message
-    
+        return info_current_file_store,{'display':'none'},options,value_dropdown,message
 
-@app.callback(Output('info-current-file-store', 'data',allow_duplicate=True),
-    Output('select-separate-data', 'style'),
-    Output('phenotype-column-input', 'min'),
-    Output('phenotype-column-input', 'max'),
-    Output('phenotype-column-input', 'value'),
-    Output('separate-groups-info','style'),
-    Input('check-separate-data', 'value'),
-    State("info-current-file-store","data"),prevent_initial_call=True
-)
-def update_output_data(value,info_current_file_store):
-    if len(value)!=0:
-        min=info_current_file_store['covar_start']
-        max=info_current_file_store['covar_end']
-        value=info_current_file_store['covar_start']
-        #style={'display': 'inline-block','vertical-align': 'middle'}
-        style={'vertical-align': 'middle'}
-        return info_current_file_store,style,min,max,value,None
     else:
+        ##Checked
+        taxa_list=get_list_taxa(info_current_file_store)
+        options=[]
+        for taxa_name in taxa_list:
+            options.append({'label':taxa_name,'value':taxa_name})
+
+        if value_ref_taxa==None:
+            #Automatic reference taxa
+            ref_taxa=find_reference_taxa(info_current_file_store)
+        else:
+            ref_taxa=value_ref_taxa
+        info_current_file_store["reference_taxa"]=ref_taxa
+        message=html.H5(f"Reference Taxa: {ref_taxa}",style={"text-indent": '30px'})
+        return info_current_file_store,None,options,ref_taxa,message
+        
+
+###### Phenotype column ######
+
+#### Update reference-taxa-status ####
+@app.callback(Output('phenotype-column-status', 'data'),
+                Input("phenotype-column-dropdown","value"),
+                State('phenotype-column-status', 'data'))
+def on_click(value, data):
+    if value is None:
+        raise PreventUpdate
+
+    return value
+
+
+#### Update all components related to Reference Taxa ####
+@app.callback(
+        Output("info-current-file-store","data",allow_duplicate=True),
+        Output('select-separate-data', 'style'),
+        Output('phenotype-column-dropdown', 'disabled',allow_duplicate=True),
+        Output('phenotype-column-dropdown', 'options'),
+        Output('phenotype-column-dropdown', 'value'),
+        Output("first-group-info","children"),
+        Output("second-group-info","children"),
+        Input('check-separate-data', 'value'),
+        Input('phenotype-column-status', 'modified_timestamp'),
+        State('phenotype-column-status', 'data'),
+        State("info-current-file-store","data"),prevent_initial_call=True)
+def update_dropdown_phentype_column(value_check,ts_phenotype_column,value_phenotype_column,info_current_file_store):
+
+    if len(value_check)==0:
+        ## Not Checked
         info_current_file_store['phenotype_column']=None
         info_current_file_store['first_group']=None
         info_current_file_store['second_group']=None
-        return info_current_file_store,{'display':'none'},None,None,None,{'display':'none'}
+        return info_current_file_store,{'display':'none'},False,[],None,[],[]
+
+    else:
+        ##Checked
+        binary_covariates_list=get_list_binary_covariates(info_current_file_store)
+
+        if binary_covariates_list==[]:
+            first_group=html.H5("First Group: No binary covariate column",style={"text-indent": '30px','color':'red'})
+            second_group=html.H5("Second Group: No binary covariate column",style={"text-indent": '30px','color':'red'})
+            options=[{"label": html.Span(['No binary covariate column'], style={'color': 'red'}),"value": "error",}]
+            value="error"
+            info_current_file_store['phenotype_column']='error'
+            info_current_file_store['first_group']='error'
+            info_current_file_store['second_group']='error'
+            return info_current_file_store,None,True,options,value,first_group,second_group
+        else:
+            options=[]
+            for covar_name in binary_covariates_list:
+                options.append({'label':covar_name,'value':covar_name})
+
+            if value_phenotype_column==None:
+                #Automatic reference taxa
+                phenotype_column=binary_covariates_list[0]
+            else:
+                phenotype_column=value_phenotype_column
+
+            disabled_dropdown=False
+            if info_current_file_store["status-run-model"]!='not-yet':
+                disabled_dropdown=True
+
+            info_current_file_store["phenotype_column"]=phenotype_column
+            nb_first_group,nb_second_group=get_info_separate_groups(info_current_file_store)
+            info_current_file_store['first_group']=nb_first_group
+            info_current_file_store['second_group']=nb_second_group
+            first_group=html.H5(f"First Group: {nb_first_group}",style={"text-indent": '30px'})
+            second_group=html.H5(f"Second Group: {nb_second_group}",style={"text-indent": '30px'})
+            
+            return info_current_file_store,None,disabled_dropdown,options,phenotype_column,first_group,second_group
+
+# # add a click to the appropriate store.
+# @app.callback(Output('info-current-file-store','data',allow_duplicate=True),
+#                 Input("phenotype-column-input","value"),
+#                 State('info-current-file-store','data'),prevent_initial_call=True)
+# def on_click(value, info_current_file_store):
+#     if value is None:
+#         raise PreventUpdate
     
+#     print("Velaueueu: ",value)
+    
+#     info_current_file_store["phenotype_column"]=value
+
+#     return info_current_file_store
+
+# # output the stored clicks in the table cell.
+# @app.callback(Output("info-current-file-store","data"),
+#                 Output("phenotype-column-output", 'children'),
+#               Output("first-group-info","children"),
+#               Output("second-group-info","children"),
+#                 Input('info-current-file-store', 'modified_timestamp'),
+#                 State("info-current-file-store","data"),
+#                 State('check-separate-data', 'value'),
+#                 Input("phenotype-column-input","value"),prevent_initial_call=True)
+# def on_data(ts,info_current_file_store,value_check,value_input):
+#     if ts is None:
+#         raise PreventUpdate
+    
+#     print('valeu check: ',value_check)
+#     print('Phen column: ',info_current_file_store["phenotype_column"])
+    
+#     if len(value_check)==0:
+#         return info_current_file_store,[],[],[]
+#     else:
+#         if info_current_file_store["phenotype_column"]!="error" and info_current_file_store["phenotype_column"]!=None and check_phenotype_column(info_current_file_store):
+#             nb_first_group,nb_second_group=get_info_separate_groups(info_current_file_store)
+#             validation_message=html.I(className="fas fa-check-circle", style={'color': 'green'})
+#             first_group=html.H5(f"First Group: {nb_first_group}",style={"text-indent": '30px'})
+#             second_group=html.H5(f"Second Group: {nb_second_group}",style={"text-indent": '30px'})
+#             #info_current_file_store['phenotype_column']=data["value"]
+#             info_current_file_store['first_group']=nb_first_group
+#             info_current_file_store['second_group']=nb_second_group
+
+#             return info_current_file_store,validation_message,first_group,second_group
+#                 #return f"Valid interval : {start} - {end}"
+#         else:
+#             first_group=html.H5("First Group: Error Phenotype Column isn't binary",style={"text-indent": '30px','color':'red'})
+#             second_group=html.H5("Second Group: Error Phenotype Column isn't binary",style={"text-indent": '30px','color':'red'})
+#             error_message=[html.I(className="fas fa-times-circle", style={'color': 'red'}),html.H5("Error : Column is not binary.",style={'display': 'inline-block'})]
+#             info_current_file_store['phenotype_column']='error'
+#             info_current_file_store['first_group']='error'
+#             info_current_file_store['second_group']='error'
+#             return info_current_file_store,error_message,first_group,second_group
+        
 # @app.callback(Output('info-current-file-store', 'data',allow_duplicate=True),
-#     Output('select-separate-data', 'children'),
-#     Output('separate-groups-info','children'),
-#     Input('check-separate-data', 'value'),
-#     State("info-current-file-store","data"),prevent_initial_call=True
-# )
-# def update_output_data(value,info_current_file_store):
+#             Output('select-separate-data', 'style'),
+#             Output('phenotype-column-input', 'min'),
+#             Output('phenotype-column-input', 'max'),
+#             Output('separate-groups-info','style'),
+#             Input('check-separate-data', 'value'),
+#             State("info-current-file-store","data"),
+#             State('phenotype-column-input', 'value'),prevent_initial_call=True)
+# def update_output_data(value,info_current_file_store,value1):
+#     print(value1)
+#     print("Je suis appelé alors que je devrais pas")
 #     if len(value)!=0:
-#         groups_info=[html.Div(id="first-group-info",children=[html.H5("First Group: ",style={"text-indent": '30px'})]),
-#         html.Div(id="second-group-info",children=[html.H5("Second Group: ",style={"text-indent": '30px'})])]
-#         pheno_select=html.Div(style={'display': 'inline-block','vertical-align': 'middle'},children=[
-#           html.H5("Phenotype column ",style={"text-indent": '30px','display': 'inline-block'}),
-#           dcc.Store(id='phenotype-column-status', storage_type=type_storage),
-#     dcc.Input(id='phenotype-column-input',type='number',min=info_current_file_store['covar_start'],max=info_current_file_store['covar_end'],step=1,value=info_current_file_store['covar_start'],persistence=True,persistence_type=type_storage,style=input_field_number_style),
-#     #dcc.Input(id='phenotype-column-input', type='text', placeholder='ex: 124',persistence=True,persistence_type=type_storage,style=input_field_style),
-#     #html.Button('Confirm', id='phenotype-column-button', n_clicks=0,style=button_style),
-#     html.Div(id='phenotype-column-output',style={'display': 'inline-block'}),
-#     ])
-#         return info_current_file_store,pheno_select,groups_info
+#         min=info_current_file_store['covar_start']
+#         max=info_current_file_store['covar_end']
+#         #value=info_current_file_store['covar_start']
+#         #style={'display': 'inline-block','vertical-align': 'middle'}
+#         style={'vertical-align': 'middle'}
+#         return info_current_file_store,style,min,max,None
 #     else:
 #         info_current_file_store['phenotype_column']=None
 #         info_current_file_store['first_group']=None
 #         info_current_file_store['second_group']=None
-#         return info_current_file_store,None,None
-
-
-###### Reference Taxa column #######
-
-# add a click to the appropriate store.
-@app.callback(Output('reference-taxa-status', 'data'),
-                Input("reference-taxa-input","value"),
-                State('reference-taxa-status', 'data'))
-def on_click(value, data):
-    if value is None:
-        raise PreventUpdate
-
-    # Give a default data dict with 0 clicks if there's no data.
-    data = data or {'value': ""}
-
-    data["value"]=value
-
-    return data
-
-# output the stored clicks in the table cell.
-@app.callback(Output('info-current-file-store','data',allow_duplicate=True),
-        Output("reference-taxa-output", 'children'),
-              Output("taxa-reference-info", 'children',allow_duplicate=True),
-                Input('reference-taxa-status', 'modified_timestamp'),
-                State('reference-taxa-status', 'data'),
-                State('info-current-file-store','data'),prevent_initial_call='initial_duplicate')
-def on_data(ts, data,info_current_file_store):
-    if ts is None:
-        raise PreventUpdate
-
-    data = data or {}
-
-    #print(data)
-
-    if data.get('value',None)==None:
-        return info_current_file_store,None,None
-    else:
-        if data["value"]=="":
-            name_reference_taxa=find_reference_taxa(info_current_file_store)
-            info_current_file_store["reference_taxa"]=name_reference_taxa
-        else:
-            name_reference_taxa=find_reference_taxa(info_current_file_store,data["value"])
-            info_current_file_store["reference_taxa"]=name_reference_taxa
-        return info_current_file_store,html.H5(f"Reference Taxa: {name_reference_taxa}",style={'display': 'inline-block'}),html.H5(f"Reference Taxa: {name_reference_taxa}",style={'text-indent': '30px'})
-  
-
-
-###### Phenotype column ######
-
-# add a click to the appropriate store.
-@app.callback(Output('phenotype-column-status', 'data'),
-                #Input("phenotype-column-button", 'n_clicks'),
-                Input("phenotype-column-input","value"),
-                State('phenotype-column-status', 'data'))
-def on_click(value, data):
-    # if n_clicks is None:
-    #     # prevent the None callbacks is important with the store component.
-    #     # you don't want to update the store for nothing.
-    #     raise PreventUpdate
-    if value is None:
-        raise PreventUpdate
-
-    # Give a default data dict with 0 clicks if there's no data.
-    data = data or {'value': ""}
-
-    data["value"]=value
-
-    return data
-
-# output the stored clicks in the table cell.
-@app.callback(Output("info-current-file-store","data",allow_duplicate=True),
-        Output("phenotype-column-output", 'children'),
-              Output("first-group-info","children"),
-              Output("second-group-info","children"),
-                Input('phenotype-column-status', 'modified_timestamp'),
-                State('phenotype-column-status', 'data'),
-                State("info-current-file-store","data"),prevent_initial_call=True)
-def on_data(ts, data,info_current_file_store):
-    if ts is None:
-        raise PreventUpdate
-
-    data = data or {}
-
-    if data.get('value',None)==None:
-        return info_current_file_store,[],[],[]
-    else:
-        if data["value"]=="":
-            return "Error : The field cannot be empty."
-        else:
-            if check_phenotype_column(info_current_file_store,data["value"]):
-                nb_first_group,nb_second_group=get_info_separate_groups(info_current_file_store,data["value"])
-                validation_message=html.I(className="fas fa-check-circle", style={'color': 'green'})
-                first_group=html.H5(f"First Group: {nb_first_group}",style={"text-indent": '30px'})
-                second_group=html.H5(f"Second Group: {nb_second_group}",style={"text-indent": '30px'})
-                info_current_file_store['phenotype_column']=data["value"]
-                info_current_file_store['first_group']=nb_first_group
-                info_current_file_store['second_group']=nb_second_group
-
-                return info_current_file_store,validation_message,first_group,second_group
-                    #return f"Valid interval : {start} - {end}"
-            else:
-                first_group=html.H5("First Group: Error Phenotype Column isn't binary",style={"text-indent": '30px','color':'red'})
-                second_group=html.H5("Second Group: Error Phenotype Column isn't binary",style={"text-indent": '30px','color':'red'})
-                error_message=[html.I(className="fas fa-times-circle", style={'color': 'red'}),html.H5("Error : Column is not binary.",style={'display': 'inline-block'})]
-                info_current_file_store['phenotype_column']='error'
-                info_current_file_store['first_group']='error'
-                info_current_file_store['second_group']='error'
-                return info_current_file_store,error_message,first_group,second_group
+#         return info_current_file_store,{'display':'none'},None,None,{'display':'none'}
   
 
 ###### Filters ######

@@ -9,16 +9,170 @@ import math
 import numpy as np
 from pytensor.tensor.linalg import inv as matrix_inverse
 import json
+import re
 import os
+
+
+import pandas as pd
 
 import sys
     
 try:
+    # First Try
     from mdine.extract_data_files import get_separate_data, get_df_covariates, get_df_taxa
+    from scripts.benchmark.verify_mdine_model import generate_counts_data_Multinomial, generate_counts_data_ZINB
 except ImportError:
+    #Second Try
     from extract_data_files import get_separate_data, get_df_covariates, get_df_taxa
+    from scripts.benchmark.verify_mdine_model import generate_counts_data_Multinomial, generate_counts_data_ZINB
+
+#File "/Users/damien/Documents/scolarite\xcc\x81/Centrale_Lyon/TFE/travail/mdine_github/scripts/mdine/MDiNE_model.py", line 38, in <module>    from verify_mdine_model import generate_counts_data_Multinomial, generate_counts_data_ZINB  File "/Users/damien/Documents/scolarite\xcc\x81/Centrale_Lyon/TFE/travail/mdine_github/scripts/mdine/verify_mdine_model.py", line 22, in <module>    from mdine.extract_data_files import get_data,separate_data_in_two_groupsModuleNotFoundError: No module named \'mdine\''
 
 #print(f"Running on PyMC v{pm.__version__}")
+
+def run_simulation(path_json_file):
+
+    # Path of the parent folder
+    folder_parent = 'test_mdine'
+
+    # Liste pour stocker les noms des sous-dossiers
+    sub_folders = []
+
+    # Parcourir tous les éléments dans le dossier parent
+    for element in os.listdir(folder_parent):
+        # Vérifier si l'élément est un dossier
+        complete_path = os.path.join(folder_parent, element)
+        if os.path.isdir(complete_path):
+            # Ajouter le nom du sous-dossier à la liste
+            sub_folders.append(element)
+
+    numbers_simulations = [int(re.search(r'\d+', nom).group()) for nom in sub_folders if re.search(r'\d+', nom)]
+    simulation_number = max(numbers_simulations)+1 if numbers_simulations else 1
+
+    folder_simulation=folder_parent+"/simulation_"+str(simulation_number)+"/"
+    os.makedirs(folder_simulation)
+    
+    with open(path_json_file, 'r') as file:
+        # Chargement des données JSON
+        simulation = json.load(file)
+
+    # Écrire les données dans le fichier JSON
+    with open(folder_simulation+"simulation.json", "w") as fichier_json:
+        json.dump(simulation, fichier_json, indent=4)
+
+    if simulation["generated_data"]==True:
+
+        model_generated_data=simulation["data"]["model_generated_data"]
+
+        if model_generated_data=="Multinomial":
+            generate_data=generate_counts_data_Multinomial
+        elif model_generated_data=="ZINB":
+            generate_data=generate_counts_data_ZINB
+        else:
+            print('The template for generating data is invalid. Choose between "Multinomial" and "ZINB".')
+
+        n_individus=simulation["data"]["n_individus"]
+        j_taxa=simulation["data"]["j_taxa"]
+        k_covariables=simulation["data"]["k_covariates"]
+
+        for i in range (simulation["data"]["nb_tests"]):
+            folder_test=folder_simulation+"/test_"+str(i)+"/"
+            os.makedirs(folder_test)
+            (X_matrix,counts_matrix)=generate_data(n_individus,k_covariables,j_taxa,folder_test)
+
+
+            #print(X_matrix)
+            #print(X_matrix.shape)
+
+            # print(counts_matrix)
+            # print(counts_matrix.shape)
+            run_model(X_matrix,counts_matrix,simulation,folder_test)
+
+        
+
+
+    return 0
+
+
+def simulation_data_R(filename):
+
+    folder_parent = 'data_R/'
+
+    # Liste pour stocker les noms des sous-dossiers
+    sub_folders = []
+
+    # Parcourir tous les éléments dans le dossier parent
+    for element in os.listdir(folder_parent):
+        # Vérifier si l'élément est un dossier
+        complete_path = os.path.join(folder_parent, element)
+        if os.path.isdir(complete_path):
+            # Ajouter le nom du sous-dossier à la liste
+            sub_folders.append(element)
+
+    numbers_simulations = [int(re.search(r'\d+', nom).group()) for nom in sub_folders if re.search(r'\d+', nom)]
+    simulation_number = max(numbers_simulations)+1 if numbers_simulations else 1
+
+    folder_simulation=folder_parent+"/simulation_"+str(simulation_number)+"/"
+    os.makedirs(folder_simulation)
+
+    model_parameters={
+    "beta_matrix": {
+        "apriori": "Ridge",
+        "parameters": {
+            "alpha": 1,
+            "beta": 1
+        }
+    },
+    "precision_matrix": {
+        "apriori": "Lasso",
+        "parameters": {
+            "lambda_init": 10
+        }
+    }}
+
+    with open(filename, 'r') as f:
+        data = json.load(f)
+        for i in range (len(data)):
+            counts= pd.DataFrame(data[i]["Counts"])
+            covariates=pd.DataFrame(data[i]["X"])
+            beta=data[i]["beta"]
+            prec0=data[i]["Prec0"]
+            prec1=data[i]["Prec1"]
+            Z=data[i]["Z"]
+
+            counts_0=counts[Z==0]
+            counts_1=counts[Z==1]
+            covariates_0=covariates[Z==0]
+            covariates_1=covariates[Z==1]
+
+            run_model(covariates_0,counts_0,model_parameters,folder_simulation+f"test_{i}_group_0")
+            run_model(covariates_1,counts_1,model_parameters,folder_simulation+f"test_{i}_group_1")
+
+def debug_MDiNE_model():
+    parameters_model={
+        'beta_matrix':{
+            'apriori':'Normal',
+            'parameters':{
+                'alpha':1,
+                'beta':1
+            }
+        },
+        'precision_matrix':{
+            'apriori':'Lasso',
+            'parameters':{
+                'lambda_init':1
+            }
+        }
+    }
+    file_path="data/crohns-numeric-tsv.tsv"
+    df=pd.read_table(file_path,sep='\t')
+    start_cov=2
+    end_cov=5
+    start_taxa=6
+    end_taxa=11
+    df_covariates=df.iloc[:,start_cov-1:end_cov]
+    df_taxa=df.iloc[:,start_taxa-1:end_taxa]
+    run_model(df_covariates,df_taxa,parameters_model,"data/debug_MDiNE")
 
 def run_model(covariate_matrix_data,counts_matrix_data,simulation,folder):
 
@@ -159,18 +313,15 @@ def run_model(covariate_matrix_data,counts_matrix_data,simulation,folder):
     
         ## Covariate matrix, allows it to be displayed on the graph.
 
-        #covariate_matrix=pm.Deterministic("X_covariates",pytensor.tensor.as_tensor_variable(covariate_matrix_data))
-        covariate_matrix=pytensor.tensor.as_tensor_variable(covariate_matrix_data)
+        covariate_matrix=pm.Deterministic("X_covariates",pytensor.tensor.as_tensor_variable(covariate_matrix_data))
 
-        #product_X_Beta=pm.Deterministic("Product_X_Beta",covariate_matrix@beta_matrix)
-        product_X_Beta=covariate_matrix@beta_matrix
+        product_X_Beta=pm.Deterministic("Product_X_Beta",covariate_matrix@beta_matrix)
 
         # Matrix W, Normal distribution
         w_matrix=pm.MvNormal("w_matrix",mu=product_X_Beta,tau=precision_matrix)
         
         #Proportions Matrix, Deterministic with Softmax
-        #proportions_matrix=pm.Deterministic("proportions_matrix",pymc.math.softmax(pymc.math.concatenate([w_matrix,pt.zeros(shape=(n_individuals,1))],axis=1),axis=1))
-        proportions_matrix=pymc.math.softmax(pymc.math.concatenate([w_matrix,pt.zeros(shape=(n_individuals,1))],axis=1),axis=1)
+        proportions_matrix=pm.Deterministic("proportions_matrix",pymc.math.softmax(pymc.math.concatenate([w_matrix,pt.zeros(shape=(n_individuals,1))],axis=1),axis=1))
 
         liste_sum_counts = counts_matrix_data.sum(axis=1).tolist()
 

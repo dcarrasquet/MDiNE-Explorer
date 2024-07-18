@@ -8,10 +8,14 @@ def get_separate_data(info_current_file):
         df_taxa=get_df_taxa(info_current_file,"df_taxa")
         df_covariates=get_df_covariates(info_current_file)
 
-        df_taxa_1=df_taxa[df_init.iloc[:,info_current_file["phenotype_column"]-1]==0]
-        df_taxa_2=df_taxa[df_init.iloc[:,info_current_file["phenotype_column"]-1]==1]
-        df_covariates_1=df_covariates[df_init.iloc[:,info_current_file["phenotype_column"]-1]==0]
-        df_covariates_2=df_covariates[df_init.iloc[:,info_current_file["phenotype_column"]-1]==1]
+        # df_taxa_1=df_taxa[df_init.iloc[:,info_current_file["phenotype_column"]-1]==0]
+        # df_taxa_2=df_taxa[df_init.iloc[:,info_current_file["phenotype_column"]-1]==1]
+        # df_covariates_1=df_covariates[df_init.iloc[:,info_current_file["phenotype_column"]-1]==0]
+        # df_covariates_2=df_covariates[df_init.iloc[:,info_current_file["phenotype_column"]-1]==1]
+        df_taxa_1=df_taxa[df_init[info_current_file["phenotype_column"]]==0]
+        df_taxa_2=df_taxa[df_init[info_current_file["phenotype_column"]]==1]
+        df_covariates_1=df_covariates[df_init[info_current_file["phenotype_column"]]==0]
+        df_covariates_2=df_covariates[df_init[info_current_file["phenotype_column"]]==1]
         return [df_covariates_1,df_taxa_1],[df_covariates_2,df_taxa_2]
 
 
@@ -79,13 +83,6 @@ def get_df_covariates(info_current_file):
     end_cov=info_current_file["covar_end"]
     return get_df_file(info_current_file).iloc[:,start_cov-1:end_cov]
 
-
-# def separate_data_in_two_groups(covariate_matrix_data,counts_matrix_data,Z_vector):
-
-#     first_group=[covariate_matrix_data[Z_vector==0],counts_matrix_data[Z_vector==0]]
-#     second_group=[covariate_matrix_data[Z_vector==1],counts_matrix_data[Z_vector==1]]
-#     return (first_group,second_group)
-
 def get_infos_file(filename):
     file_extention=filename.split(".")[-1]
     if file_extention=="csv":
@@ -108,15 +105,13 @@ def get_df_file(info_current_file):
         print("Error")
     return df
 
-def get_info_separate_groups(info_current_file,phenotype_column):
+def get_info_separate_groups(info_current_file):
 
     df=get_df_file(info_current_file)
-    column_name = df.columns[phenotype_column-1]
-    zero_count = (df[column_name] == 0).sum()
-    one_count = (df[column_name] == 1).sum()
-
-    # df_zeros = df[df[column_name] == 0].copy()
-    # df_ones = df[df[column_name] == 1].copy()
+    phenotype_column=info_current_file["phenotype_column"]
+    # column_name = df.columns[phenotype_column-1]
+    zero_count = (df[phenotype_column] == 0).sum()
+    one_count = (df[phenotype_column] == 1).sum()
 
     return zero_count,one_count
 
@@ -171,17 +166,6 @@ def find_reference_taxa(info_current_file,reference_column=None):
     #print(df_filtered.shape)
 
     #print(df_filtered.head())
-
-def check_phenotype_column(info_current_file,column_index):
-    df=get_df_file(info_current_file)
-    column = df.iloc[:, column_index-1]
-    unique_values = column.unique()
-    
-    # Check whether the unique values are only 0 and 1
-    if set(unique_values) == {0, 1}:
-        return True
-    else:
-        return False
     
 def filter_percent_zeros(df_taxa,percent_filtre):
     threshold = percent_filtre / 100.0  # Convertir le pourcentage en proportion
@@ -207,14 +191,22 @@ def filter_percent_zeros(df_taxa,percent_filtre):
 
     return df_filtered
 
+def get_list_taxa(info_current_file_store):
+    df=get_df_taxa(info_current_file_store,"df_taxa")
+    return(list(df.columns))
 
+def get_list_binary_covariates(info_current_file_store):
+    df=get_df_covariates(info_current_file_store)
+    covariate_names=list(df.columns)
 
-if __name__=="__main__":
-    print(1+1)
-    #simulation_data_R("data/data_R/simulated_data_NB_N100_J50_K20.json")
-    #filter_deviation_mean("data/crohns.csv",10)
-    # (covariate_matrix_data,counts_matrix_data,Z_vector)=get_data("data/crohns.csv")
-    # first_group,second_group=separate_data_in_two_groups(covariate_matrix_data,counts_matrix_data,Z_vector)
-    # print(first_group[0].shape,first_group[1].shape)
-    # print(second_group[0].shape,second_group[1].shape)
+    list_binary_covariates=[]
+
+    for covariate in covariate_names:
+        column = df[covariate]
+        unique_values = column.unique()
+        # Check whether the unique values are only 0 and 1
+        if set(unique_values) == {0, 1}:
+            list_binary_covariates.append(covariate)
     
+    return list_binary_covariates
+

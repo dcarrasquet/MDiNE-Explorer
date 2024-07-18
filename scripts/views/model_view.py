@@ -415,7 +415,7 @@ def on_click(n_clicks,data):
     return data
 
 # output the stored clicks in the table cell.
-@app.callback(Output("info-current-file-store", 'data',allow_duplicate=True),
+@app.callback(Output("info-current-file-store",'data',allow_duplicate=True),
             Output("run-model-output", 'children'),
               Output("run-model-button",'disabled'),
               Output("run-model-button","title"),
@@ -521,15 +521,18 @@ def on_data(ts,n_intervals,data,info_current_file_store,model_output_children):
         #               html.H5(sampling_info),
         #               html.Div([html.Progress(id="first-progress-bar",className="progress-bar", value=str(percentage), max="100"),html.H5(percentage_str,style={'display':'inline-block'})]),
         #               html.H5(remaining_time)]
+
+        disabled_cancel_button=False
         
         if check_run_finish(info_current_file_store):
             #print("Le thread est terminé.")
             info_current_file_store["status-run-model"] = "completed"
+            disabled_cancel_button=True
             
         # else:
         #     print("Le thread est toujours en cours d'exécution...")
 
-        return info_current_file_store,children,True,title,False
+        return info_current_file_store,children,True,title,disabled_cancel_button
     else:
         return info_current_file_store,model_output_children,True,None,True
     

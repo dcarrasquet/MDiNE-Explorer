@@ -1,9 +1,0 @@
-name: pymc_env
-channels:
-  - defaults
-dependencies:
-  - pymc[version='>=5']
-  - spyder
-  - dash_cytoscape
-  - celery
-prefix: /opt/anaconda3/envs/pymc_env

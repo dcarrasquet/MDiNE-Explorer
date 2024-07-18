@@ -127,8 +127,8 @@ if completed==False:
 else:
     initial_info_current_file={
         "monitor_thread_launched":False,
-        'filename':"data/dash_app/session_1/crohns-numeric-tsv.tsv",
-        'session_folder':"data/dash_app/session_1/",
+        'filename':"data/dash_app/session_0/crohns-numeric-tsv.tsv",
+        'session_folder':"data/dash_app/session_0/",
         'nb_rows':100,
         'nb_columns':11,
         'covar_start':2,
@@ -136,12 +136,12 @@ else:
         'taxa_start':6,
         'taxa_end':11,
         'reference_taxa':'otu.counts.ref',
-        'phenotype_column':None,
-        'first_group':None,
-        'second_group':None,
+        'phenotype_column':2,
+        'first_group':34,
+        'second_group':66,
         'filter_zeros':None,
         'filter_dev_mean':None,
-        'status-run-model':'completed',
+        'status-run-model':'not-yet',
         'parameters_model':{
             'beta_matrix':{
                 'apriori':'Normal',

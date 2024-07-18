@@ -16,8 +16,9 @@ import matplotlib.pyplot as plt
 matplotlib.use('Agg')
 
 from maindash import app, type_storage #info_current_file
-from mdine.plot_mdine_results import get_elements_co_occurence_network,get_stylesheet_co_occurrence_network,get_stylesheet_diff_network, get_energy_figure,get_acceptance_rate,get_trace_beta,get_trace_precision_matrix
-from mdine.extract_data_files import get_df_file, get_separate_data,get_df_taxa
+from mdine.performance_metrics import get_energy_figure,get_acceptance_rate,get_trace_beta,get_trace_precision_matrix
+from mdine.cytoscape_graph import get_elements_co_occurence_network,get_stylesheet_co_occurrence_network,get_stylesheet_diff_network
+from mdine.extract_data_files import get_separate_data,get_df_taxa
 
 button_download_style = {
     'background': '#4A90E2',
@@ -156,6 +157,7 @@ def layout_co_occurence_networks(legend_store,info_current_file_store):
     switch_networks_diff=None
 
     if info_current_file_store["phenotype_column"]==None:
+        print("Only one group")
         switch_networks_diff=html.Div()
         file_idata=os.path.join(info_current_file_store["session_folder"],"idata.pkl")
         df_taxa=get_df_taxa(info_current_file_store,"df_taxa")
@@ -295,7 +297,7 @@ def layout_co_occurence_networks(legend_store,info_current_file_store):
     Input('slider-font-size', 'value'),
     State('state-separate-groups','children'),
     State('legend-store','data'),
-    State("info-current-file-store","data"),prevent_initial_call='initial_duplicate'
+    State("info-current-file-store","data"),prevent_initial_call=True
 )
 def update_graph(credibility, edges_width, nodes_size,font_size,children,legend_store,info_current_file_store):
 
@@ -327,7 +329,6 @@ def update_graph(credibility, edges_width, nodes_size,font_size,children,legend_
         file_idata1=os.path.join(info_current_file_store["session_folder"],"first_group","idata.pkl")
         file_idata2=os.path.join(info_current_file_store["session_folder"],"second_group","idata.pkl")
 
-        # file_idata="data/dash_app/session_5/idata.pkl"
 
         # df_taxa=get_df_file(info_current_file).iloc[:,5:11]
 
@@ -381,7 +382,7 @@ def get_image(n_clicks):
     State('slider-nodes-size', 'value'),
     State('slider-font-size', 'value'),
     State('legend-store','data'),
-    State("info-current-file-store","data"),prevent_initial_call='initial_duplicate'
+    State("info-current-file-store","data"),prevent_initial_call=True
 )
 def change_stylesheet(value,credibility, edges_width, nodes_size,font_size,legend_store,info_current_file_store):
 
@@ -394,15 +395,8 @@ def change_stylesheet(value,credibility, edges_width, nodes_size,font_size,legen
     df_taxa1=separate_data[0][1]
     df_taxa2=separate_data[1][1]
 
-    # file_idata1=os.path.join(info_current_file["session_folder"],"first_group","idata.pkl")
-    # file_idata2=os.path.join(info_current_file["session_folder"],"second_group","idata.pkl")
-
-    file_idata1=os.path.join("data/dash_app/session_7","first_group","idata.pkl")
-    file_idata2=os.path.join("data/dash_app/session_7","second_group","idata.pkl")
-
-    # file_idata="data/dash_app/session_5/idata.pkl"
-
-    # df_taxa=get_df_file(info_current_file).iloc[:,5:11]
+    file_idata1=os.path.join(info_current_file_store["session_folder"],"first_group","idata.pkl")
+    file_idata2=os.path.join(info_current_file_store["session_folder"],"second_group","idata.pkl")
 
     with open(file_idata1, "rb") as f1:
         idata1 = pickle.load(f1)
