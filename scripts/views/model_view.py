@@ -552,7 +552,6 @@ def read_json_file(file_path):
 def write_output_to_file(fd,json_filename):
             with os.fdopen(fd, 'r') as output:
                 for line in output:
-                    print('Output: ',line)
                     data=extract_info(line)
                     try:
                         with open(json_filename, 'w') as file:

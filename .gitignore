@@ -2,3 +2,6 @@ test_mdine/*
 results/*
 data/*
 scripts/benchmark/*
+scripts/views/__pycache__/*
+scripts/mdine/__pycache__/*
+scripts/__pycache__/*

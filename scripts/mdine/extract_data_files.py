@@ -23,7 +23,8 @@ def get_df_taxa(info_current_file,type_output):
     start_taxa=info_current_file["taxa_start"]
     end_taxa=info_current_file["taxa_end"]
     #No filters
-    df_total=get_df_file(info_current_file).iloc[:,start_taxa-1:end_taxa]
+    df_total=get_df_file(info_current_file).iloc[:,start_taxa-1:end_taxa+1]
+
     reference_taxa=info_current_file["reference_taxa"]
 
     #Remove ref column to apply filter
@@ -109,7 +110,7 @@ def get_info_separate_groups(info_current_file):
 
     df=get_df_file(info_current_file)
     phenotype_column=info_current_file["phenotype_column"]
-    # column_name = df.columns[phenotype_column-1]
+
     zero_count = (df[phenotype_column] == 0).sum()
     one_count = (df[phenotype_column] == 1).sum()
 

@@ -1,5 +1,5 @@
 from dash import dcc, html, callback_context
-from dash.dependencies import Input, Output, State, ALL, MATCH
+from dash.dependencies import Input, Output, State, ALL
 import pickle
 import dash_cytoscape as cyto
 cyto.load_extra_layouts()
@@ -18,7 +18,7 @@ matplotlib.use('Agg')
 from maindash import app, type_storage #info_current_file
 from mdine.performance_metrics import get_energy_figure,get_acceptance_rate,get_trace_beta,get_trace_precision_matrix
 from mdine.cytoscape_graph import get_elements_co_occurence_network,get_stylesheet_co_occurrence_network,get_stylesheet_diff_network
-from mdine.extract_data_files import get_separate_data,get_df_taxa
+from mdine.extract_data_files import get_separate_data,get_df_taxa,get_list_taxa
 
 button_download_style = {
     'background': '#4A90E2',
@@ -107,6 +107,11 @@ input_field_label_style = {
     'vertical-align': 'middle',
 }
 
+style_dropdown=None
+style_div_parent_dropdown={'display': 'flex', 'align-items': 'center'}
+style_elements_associated={"margin":'30px'}
+style_div_dropdown={'width': '50%'}
+
 def layout_visualization():
     return html.Div([
             #html.H3('Visualization Page'),
@@ -114,6 +119,7 @@ def layout_visualization():
             dcc.Store(id='tab-status', storage_type=type_storage),
             dcc.Tabs(id="subtabs", value='subtab-cooccurrence',style={'margin-bottom': '20px','display':'none'},persistence=True,persistence_type=type_storage, children=[
                 dcc.Tab(label='Co-occurrence networks', value='subtab-cooccurrence'),
+                #dcc.Tab(label='Features Selection', value='subtab-features-selection'),
                 dcc.Tab(label='Performance metrics', value='subtab-performance')
             ]),
             html.Div(id='subtabs-content'),
@@ -147,6 +153,8 @@ def render_subcontent(subtab,legend_store,subtabs_style,info_current_file_store)
             return layout_co_occurence_networks(legend_store,info_current_file_store),{'margin-bottom': '20px'}
         elif subtab == 'subtab-performance':
             return layout_performance_metrics(),{'margin-bottom': '20px'}
+        elif subtab== 'subtab-features-selection':
+            return layout_features_selection(),{'margin-bottom': '20px'}
     else:
         print("info current file status run odel not correct")
         return None,{'margin-bottom': '20px','display':'none'}
@@ -157,7 +165,6 @@ def layout_co_occurence_networks(legend_store,info_current_file_store):
     switch_networks_diff=None
 
     if info_current_file_store["phenotype_column"]==None:
-        print("Only one group")
         switch_networks_diff=html.Div()
         file_idata=os.path.join(info_current_file_store["session_folder"],"idata.pkl")
         df_taxa=get_df_taxa(info_current_file_store,"df_taxa")
@@ -189,13 +196,13 @@ def layout_co_occurence_networks(legend_store,info_current_file_store):
     stylesheet=get_stylesheet_co_occurrence_network(idata,df_taxa,legend_store,hdi=0.95,node_size=0.01,edge_width=5,font_size=20)
 
     return html.Div([
-                #html.H4('Co-occurrence networks'),
+                html.Div(id="jesersarien"),
                 html.Div(id="state-separate-groups",children=[switch_networks_diff]),
                 cyto.Cytoscape(
                     id='cytoscape',
                     elements=elements,
                     stylesheet=stylesheet,
-                    #autoRefreshLayout=True,
+                    autoRefreshLayout=True,
                     style={'width': '90%','height':'50vh','backgroundColor': '#f0f0f0','margin': '0 auto'},
                     #layout={'name': 'concentric'} #cose #concentric
                     layout={'name': 'preset'}
@@ -273,13 +280,15 @@ def layout_co_occurence_networks(legend_store,info_current_file_store):
 
         html.Div(id="div-modify-legend",style={'display':'none'},children=[
             #dcc.Store(id='legend-store', data=[],storage_type=type_storage),
-            html.H5("Coucou"),
-            html.Div(id='selected-nodes-output'),
-            html.Div(id='container-items-add', children=[
+            #html.H5("Coucou"),
+            #html.Div(id='selected-nodes-output'),
+            # html.Div(id='container-items-add', children=[
+            # html.Div(id='items-container'),
+            # html.Button('Add Item', id='add-item', n_clicks=0,style=button_add_item_style)
+            # ]),
             html.Div(id='items-container'),
-            html.Button('Add Item', id='add-item', n_clicks=0,style=button_add_item_style)
-            ]),
-            html.Div(id='list-items-selection'),
+            html.Button('Add a group to the legend', id='add-item', n_clicks=0,style=button_add_item_style),
+            #html.Div(id='list-items-selection'),
             
             
             
@@ -287,6 +296,15 @@ def layout_co_occurence_networks(legend_store,info_current_file_store):
                 
 
            ])
+
+# @app.callback(
+#     Output('jesersarien', 'children'),
+#     Input('cytoscape', 'stylesheet'),
+#     Input('cytoscape', 'elements'))
+# def test(stylesheet,elements):
+#     print("Stylesheet: ",stylesheet)
+#     print("Elements: ",elements)
+#     return []
 
 # Callback pour mettre à jour le graphique Cytoscape
 @app.callback(
@@ -349,17 +367,9 @@ def update_graph(credibility, edges_width, nodes_size,font_size,children,legend_
 
 @app.callback(
     Output("cytoscape", "generateImage"),
-    [
-        Input("button-download-cytoscape", "n_clicks")
-    ])
+    Input("button-download-cytoscape", "n_clicks"))
 def get_image(n_clicks):
 
-    # File type to output of 'svg, 'png', 'jpg', or 'jpeg' (alias of 'jpg')
-    #ftype = tab
-
-    # 'store': Stores the image data in 'imageData' !only jpg/png are supported
-    # 'download'`: Downloads the image as a file with all data handling
-    # 'both'`: Stores image data and downloads image as file.
     if n_clicks==None:
         raise PreventUpdate
     
@@ -385,11 +395,9 @@ def get_image(n_clicks):
     State("info-current-file-store","data"),prevent_initial_call=True
 )
 def change_stylesheet(value,credibility, edges_width, nodes_size,font_size,legend_store,info_current_file_store):
+    ## Change between groups if the user separates the data
+    ## Function called only if there are two different groups
 
-    #Function called only if there are two different groups
-    
-    #df_taxa=info_current_file["df_taxa"]
-    #file_idata=os.path.join(info_current_file["session_folder"],"idata.pkl")
 
     separate_data=get_separate_data(info_current_file_store)
     df_taxa1=separate_data[0][1]
@@ -416,14 +424,12 @@ def change_stylesheet(value,credibility, edges_width, nodes_size,font_size,legen
 
 
 def layout_performance_metrics():
-    
-
     return html.Div([
             html.H4('Performance metrics'),
             html.Div([
     html.Label("Select the figures you want to plot:", style={'font-weight': 'bold'}),
     dcc.Dropdown(
-        id='dropdown',
+        id='dropdown-performances-metrics',
         options=[
             {'label': 'Energy Graph', 'value': 'energy'},
             {'label': 'Acceptance Rate', 'value': 'acceptance_rate'},
@@ -444,7 +450,7 @@ def layout_performance_metrics():
 
 @app.callback(
     Output("output-graph-dropdown","children"),
-    Input("dropdown","value"),
+    Input("dropdown-performances-metrics","value"),
     State("info-current-file-store","data"),
     #State("output-graph-dropdown"),
 )
@@ -669,127 +675,106 @@ def output_dropdown(list_graphs,info_current_file_store):
 #div-download-sliders-graph
 #div-modify-legend
 @app.callback(
-    Output('selected-nodes-output', 'children'),
+    #Output('selected-nodes-output', 'children'),
     Output('div-sliders-graph', 'style'),
     Output('div-modify-legend', 'style'),
     Output("button-modify-legend","children"),
     Output("button-modify-legend","style"),
     Output("items-container","children"),
-    Output('refresh-url', 'href'),
+    #Output('refresh-url', 'href'),
+    Output("cytoscape","elements"),
+    Output("cytoscape","stylesheet"),
     Input("button-modify-legend","n_clicks"),
-    Input('cytoscape', 'selectedNodeData'),
-    State('legend-store','data')
+    State('legend-store','data'),
+    State("info-current-file-store","data"),
+    State("cytoscape","elements"),
+    State('state-separate-groups','children'),
+    State("cytoscape","stylesheet"),
+    State('slider-credibility', 'value'),
+    State('slider-edges-width', 'value'),
+    State('slider-nodes-size', 'value'),
+    State('slider-font-size', 'value'),
 )
-def display_selected_nodes(n_clicks,data,data_legend_store):
+def display_selected_nodes(n_clicks,data_legend_store,info_current_file_store,cytoscape_elements,state_separate_groups,current_stylesheet,credibility, edges_width, nodes_size,font_size):
 
-    print("Selected data nodes: ",data)
 
     if n_clicks==None:
         raise PreventUpdate
     elif n_clicks%2==0:
         # Return to sliders
-        return None,None,{'display':'none'},"Modify legend",button_modify_legend_style,[],'/'
+        df_taxa=get_df_taxa(info_current_file_store,"df_taxa")
+        elements=get_elements_co_occurence_network(df_taxa,data_legend_store)
+
+        specific_graph=None
+
+
+        try:
+            specific_graph=state_separate_groups[0]['props']['value']
+        except:
+            specific_graph=None
+
+        if specific_graph==None:
+            file_idata=os.path.join(info_current_file_store["session_folder"],"idata.pkl")
+
+            df_taxa=get_df_taxa(info_current_file_store,"df_taxa")
+
+            with open(file_idata, "rb") as f:
+                idata = pickle.load(f)
+
+            stylesheet=get_stylesheet_co_occurrence_network(idata,df_taxa,data_legend_store,hdi=credibility,node_size=nodes_size,edge_width=edges_width,font_size=font_size)
+        else:
+            separate_data=get_separate_data(info_current_file_store)
+            df_taxa1=separate_data[0][1]
+            df_taxa2=separate_data[1][1]
+
+            # file_idata1=os.path.join(info_current_file["session_folder"],"first_group","idata.pkl")
+            # file_idata2=os.path.join(info_current_file["session_folder"],"second_group","idata.pkl")
+
+            file_idata1=os.path.join(info_current_file_store["session_folder"],"first_group","idata.pkl")
+            file_idata2=os.path.join(info_current_file_store["session_folder"],"second_group","idata.pkl")
+
+
+            # df_taxa=get_df_file(info_current_file).iloc[:,5:11]
+
+            with open(file_idata1, "rb") as f1:
+                idata1 = pickle.load(f1)
+
+            with open(file_idata2, "rb") as f2:
+                idata2 = pickle.load(f2)
+
+            if specific_graph=='first_group':
+                stylesheet=get_stylesheet_co_occurrence_network(idata1,df_taxa1,data_legend_store,hdi=credibility,node_size=nodes_size,edge_width=edges_width,font_size=font_size)
+            elif specific_graph=='second_group':
+                stylesheet=get_stylesheet_co_occurrence_network(idata2,df_taxa2,data_legend_store,hdi=credibility,node_size=nodes_size,edge_width=edges_width,font_size=font_size)
+            elif specific_graph=='diff_network':
+                stylesheet=get_stylesheet_diff_network(idata1,df_taxa1,idata2,df_taxa2,legend_store=data_legend_store,hdi=credibility,node_size=nodes_size,edge_width=edges_width,font_size=font_size)
+
+
+        return None,{'display':'none'},"Modify legend",button_modify_legend_style,[],elements,stylesheet
     else:
         # Become Save Legend
         # Display Legend attributes
-        output_nodes=None
-        if not data:
-            output_nodes="No nodes selected"
-        else:
-            selected_nodes = [node['label'] for node in data]
-            output_nodes=f"Selected nodes: {', '.join(selected_nodes)}"
+        remaining_taxa=get_list_remaining_taxa(data_legend_store,info_current_file_store)
+        list_items=create_items(data_legend_store,remaining_taxa)
 
-        list_items=[]
-        if data_legend_store!=[]:
-            for group in data_legend_store:
-                string_list_elements=""
-                if group["elements"]==[]:
-                    string_list_elements="No nodes selected"
-                else:
-                    for element in group["elements"]:
-                        string_list_elements+=element+", "
-                element = html.Div([
-                    html.Div(id={'type': 'color-box', 'index': group["id"]},style={'width': '20px', 'height': '20px', 'backgroundColor': group["color"],'margin-left':"1%"}),
-                    dcc.Input(type='text', placeholder='Enter hex color value',value=group["color"], style=input_field_color_style,id={'type': 'color-input', 'index': group["id"]}),
-                    dcc.Input(type='text', placeholder='Enter label',id={'type': 'label-input', 'index': group["id"]},value=group["label"], style=input_field_label_style),
-                    html.H5("Elements associated: ",style={'margin-left': '20%'}),
-                    #html.Div(info_text,
-                    html.Div(string_list_elements,
-                    #style={'width': '100%', 'height': '50px', 'overflow': 'auto', 'border': '1px solid #ccc', 'padding': '5px', 'margin': '5px', 'whiteSpace': 'pre-wrap'}
-                    style={'width': '30%','borderRadius': '5px', 'overflowX': 'auto', 'border': '1px solid #ccc', 'padding': '5px', 'margin': '5px', 'whiteSpace': 'nowrap'}
-                ),
-                    html.I(className="fas fa-trash", id={'type': 'trash-icon', 'index': group["id"]}, style={'color': 'red', 'cursor': 'pointer', 'margin': '5px','margin-left': 'auto','margin-right': '5%'}),
-                ], id=group["id"], style={'width':'90%','margin': '0 auto','border': '1px solid black', 'border-radius': '10px', 'padding': '10px', 'display': 'flex', 'align-items': 'center','margin-top':'5px'})
-                list_items.append(element)
+            
 
-        return output_nodes,{'display':'none'},None,"Save legend",button_save_legend_style,list_items,None
-        
-# @app.callback(
-#     Output('items-container', 'children'),
-#     [Input('add-item', 'n_clicks')],
-#     [State('items-container', 'children')]
-# )
-# def display_items(n_clicks, children):
-#     if children==None:
-#         children=[]
-#     new_element = html.Div([
-#         html.Div(style={'width': '20px', 'height': '20px', 'backgroundColor': '#00FF00'}),
-#         dcc.Input(type='text', placeholder='Enter hex color value', style=input_field_color_style),
-#         dcc.Input(type='text', placeholder='Enter label', style=input_field_label_style),
-#         html.I(className="fas fa-trash",id="trash-icon", style={'color': 'red', 'cursor': 'pointer','margin': '5px','margin-left': 'auto','margin-right': '5%'}),
-#     ], style={'border': '1px solid black', 'border-radius': '10px', 'padding': '10px', 'margin': '10px', 'display': 'flex', 'align-items': 'center'})
-    
-#     if n_clicks > 0:
-#         children.append(new_element)
-    
-#     return children
-
-@app.callback(
-    Output('items-container', 'children',allow_duplicate=True),
-    Input('legend-store', 'data'),prevent_initial_call=True
-)
-def display_items(data_legend_store):
-    
-    list_items=[]
-    if data_legend_store!=[]:
-        for group in data_legend_store:
-            string_list_elements=""
-            if group["elements"]==[]:
-                string_list_elements="No nodes selected"
-            else:
-                for element in group["elements"]:
-                    string_list_elements+=element+", "
-
-            color_value=group["color"] if is_valid_hex_color(group["color"]) else '#FFFFFF'
-
-            element = html.Div([
-                html.Div(id={'type': 'color-box', 'index': group["id"]},style={'width': '20px', 'height': '20px', 'backgroundColor': color_value,'margin-left':"1%"}),
-                dcc.Input(type='text', placeholder='Enter hex color value',value=group["color"], style=input_field_color_style,id={'type': 'color-input', 'index': group["id"]}),
-                dcc.Input(type='text', placeholder='Enter label',id={'type': 'label-input', 'index': group["id"]},value=group["label"], style=input_field_label_style),
-                html.H5("Elements associated: ",style={'margin-left': '20%'}),
-                #html.Div(info_text,
-                html.Div(string_list_elements,
-                #style={'width': '100%', 'height': '50px', 'overflow': 'auto', 'border': '1px solid #ccc', 'padding': '5px', 'margin': '5px', 'whiteSpace': 'pre-wrap'}
-                style={'width': '30%','borderRadius': '5px', 'overflowX': 'auto', 'border': '1px solid #ccc', 'padding': '5px', 'margin': '5px', 'whiteSpace': 'nowrap'}
-            ),
-                html.I(className="fas fa-trash", id={'type': 'trash-icon', 'index': group["id"]}, style={'color': 'red', 'cursor': 'pointer', 'margin': '5px','margin-left': 'auto','margin-right': '5%'}),
-            ], id=group["id"], style={'width':'90%','margin': '0 auto','border': '1px solid black', 'border-radius': '10px', 'padding': '10px', 'display': 'flex', 'align-items': 'center','margin-top':'5px'})
-            list_items.append(element)
-
-
-    return list_items
+        return {'display':'none'},None,"Save legend",button_save_legend_style,list_items,cytoscape_elements,current_stylesheet
     
 
 
 
 @app.callback(
     Output('legend-store', 'data',allow_duplicate=True),
-    [Input('add-item', 'n_clicks'),
-     Input({'type': 'trash-icon', 'index': ALL}, 'n_clicks')],
-     [State('legend-store', 'data'),
-    State('items-container', 'children')],prevent_initial_call=True
+    Output('items-container', 'children',allow_duplicate=True),
+    Input('add-item', 'n_clicks'),
+    Input({'type': 'trash-icon', 'index': ALL}, 'n_clicks'),
+    State('legend-store', 'data'),
+    State('items-container', 'children'),
+    State("info-current-file-store","data"),prevent_initial_call=True
 )
-def display_items(add_clicks, trash_clicks,legend,children):
+def display_items(add_clicks, trash_clicks,legend,children,info_current_file_store):
+
     if children is None:
         children = []
 
@@ -798,7 +783,7 @@ def display_items(add_clicks, trash_clicks,legend,children):
     ctx = callback_context
 
     if not ctx.triggered:
-        return legend
+        raise PreventUpdate
 
     triggered_id = ctx.triggered[0]['prop_id'].split('.')[0]
 
@@ -823,8 +808,12 @@ def display_items(add_clicks, trash_clicks,legend,children):
         if trash==True:
             trash_index = eval(triggered_id)['index']
             legend=[group for group in legend if group['id']!=trash_index]
+    
+    remaining_taxa=get_list_remaining_taxa(legend,info_current_file_store)
 
-    return legend
+    list_items=create_items(legend,remaining_taxa)
+
+    return legend,list_items
 
 def random_hex_color():
     return "#{:06x}".format(random.randint(0, 0xFFFFFF))
@@ -832,7 +821,7 @@ def random_hex_color():
 
 @app.callback(
     Output('legend-store', 'data',allow_duplicate=True),
-    #Output({'type': 'color-box', 'index': ALL}, 'style'),
+    Output({'type': 'color-box', 'index': ALL}, 'style'),
     Input({'type': 'color-input', 'index': ALL}, 'value'),
     Input({'type': 'label-input', 'index': ALL}, 'value'),
     State('legend-store', 'data'),
@@ -840,10 +829,12 @@ def random_hex_color():
 )
 def update_group_data(new_color_list,new_label_list, store_data):
 
+    
+
     ctx = callback_context
 
     if [trigger['prop_id'].split('.')[0] for trigger in ctx.triggered]==['']:
-        return store_data
+        raise PreventUpdate
 
     triggered_inputs = [json.loads(trigger['prop_id'].split('.')[0]) for trigger in ctx.triggered]
 
@@ -851,128 +842,87 @@ def update_group_data(new_color_list,new_label_list, store_data):
 
     list_id=remove_duplicates([triggered_input['index'] for triggered_input in triggered_inputs])
 
-    for triggered_id in list_id:
-        found=False
-        for idx, group in enumerate(store_data):
-            if group['id'] == triggered_id:
-                found=True
-                group['color'] = new_color_list[idx] 
-                group['label'] = new_label_list[idx]
-                break
-        if found==False:
-            store_data.append({
-                'id': triggered_id,
-                'color': new_color_list[idx],
-                'label': new_label_list[idx],
-                'elements': []
-            })
-
-
-    return store_data
-
-@app.callback(
-        Output("list-items-selection","children"),
-        Output("container-items-add","style",allow_duplicate=True),
-        Output("list-items-selection","style",allow_duplicate=True),
-        Input('cytoscape', 'selectedNodeData'),
-        State('div-modify-legend','style'),
-        State("legend-store","data"),prevent_initial_call=True
-)
-def create_list_items(selectedNodes,style_div_modify,legend_store):
-    if selectedNodes==None:
-        raise PreventUpdate
-    #print('Je suis appelé')
-    #print(selectedNodes)
-    style_display_none={'display':'none'}
-    if style_div_modify==style_display_none:
-        raise PreventUpdate
-    
-    if legend_store==[]:
-        return ["No group is created, so you cannot assign nodes to a group. Please deselect nodes."],style_display_none,None
-    if selectedNodes==[]:
-        return None,None,style_display_none
+    if len(new_color_list)==len(store_data):
+        #print("All components have triggered the callback")
+        ## All components have triggered the callback
+        for idx,group in enumerate(store_data):
+            group['color'] = new_color_list[idx] 
+            group['label'] = new_label_list[idx]
     else:
-        #list_items=[]
-        buttons = []
-        for group in legend_store:
-            button=html.Button(
-                children=[
-                    html.Div(style={'width': '15px', 'height': '15px', 'backgroundColor': group['color'], 'display': 'inline-block', 'borderRadius': '50%', 'marginRight': '5px'}),
-                    html.Span(group['label'])
-                ],
-                style={'width':'15%','margin': '0 auto','border': '1px solid black', 'border-radius': '10px', 'padding': '10px', 'display': 'flex', 'align-items': 'center','margin-top':'5px'},
-                id={'type': 'button-item', 'index': group["id"]}
-            )
-            buttons.append(button)
-            # element2 = html.Div([
-            #         #html.Div(id={'type': 'color-box', 'index': group["id"]},style={'width': '20px', 'height': '20px', 'backgroundColor': group["color"],'margin-left':"1%",'border-radius':'5px'}),
-            #         html.Div(style={'width': '10px', 'height': '10px', 'backgroundColor': group["color"], 'display': 'inline-block', 'borderRadius': '50%', 'marginRight': '5px'}),
-            #         html.Div(group["label"],id={'type': 'div-label', 'index': group["id"]}, style=input_field_label_style),
-            #         html.Span(group["label"]),
-            #         html.H5("Elements associated: ",style={'margin-left': '20%'}),
-            #         #html.Div(info_text,
-            #         html.Div(group["elements"],
-            #         #style={'width': '100%', 'height': '50px', 'overflow': 'auto', 'border': '1px solid #ccc', 'padding': '5px', 'margin': '5px', 'whiteSpace': 'pre-wrap'}
-            #         style={'width': '30%','borderRadius': '5px', 'overflowX': 'auto', 'border': '1px solid #ccc', 'padding': '5px', 'margin': '5px', 'whiteSpace': 'nowrap'}
-            #     ),
-            #         #html.I(className="fas fa-trash", id={'type': 'trash-icon', 'index': group["id"]}, style={'color': 'red', 'cursor': 'pointer', 'margin': '5px','margin-left': 'auto','margin-right': '5%'}),
-            #     ], id=group["id"], style={'width':'30%','margin': '0 auto','border': '1px solid black', 'border-radius': '10px', 'padding': '10px', 'display': 'flex', 'align-items': 'center','margin-top':'5px'})
-            #list_items.append(element)
-        rows = []
-        for i in range(0, len(buttons), 2):
-            row = html.Div(buttons[i:i+2], style={'display': 'flex', 'justifyContent': 'space-between'})
-            rows.append(row)
-        return rows,style_display_none,None
+        ##Only one component has triggered
+        triggered_id=triggered_inputs[0]
+        for group in store_data:
+            if group['id']==triggered_id:
+                #idx=list_id.index(triggered_id)
+                group['color'] = new_color_list[0] 
+                group['label'] = new_label_list[0]
+                break
 
-#id={'type': 'button-item', 'index': group["id"]}
+    list_color_box=[]
+    for color_value in new_color_list:
+        if is_valid_hex_color(color_value):
+            list_color_box.append({'width': '20px', 'height': '20px', 'backgroundColor': color_value,'margin-left':"1%"})
+        else:
+            list_color_box.append({'width': '20px', 'height': '20px', 'backgroundColor': "#FFFFFF",'margin-left':"1%"})
+
+
+    return store_data,list_color_box
 
 @app.callback(
     Output('legend-store', 'data',allow_duplicate=True),
-    Output("container-items-add","style",allow_duplicate=True),
-    Output("list-items-selection","style",allow_duplicate=True),
-    #Output({'type': 'color-box', 'index': ALL}, 'style'),
-    Input({'type': 'button-item', 'index': ALL}, 'n_clicks'),
-    State('cytoscape', 'selectedNodeData'),
+    Output({'type': 'dropdown-group-items', 'index': ALL}, 'options'),
+    Input({'type': 'dropdown-group-items', 'index': ALL}, 'value'),
     State('legend-store', 'data'),
+    State('info-current-file-store', 'data'),
     prevent_initial_call=True
 )
-def update_group_data(button_list,selectedNodes, store_data):
+def update_group_data(list_value_dropdown, store_data,info_current_file_store):
 
-    style_display_none={'display':'none'}
-
-    #print("Button list:",button_list)
-
-    if any(element is not None for element in button_list)==False:
-        #print("Tous égaux à None")
-        raise PreventUpdate
-    
-    #print("Au moins 1 différent de None")
-
+    #print("Callback dropdown group items lauched")
+    #print('jenairammre:',list_value_dropdown)
     ctx = callback_context
 
+    if [trigger['prop_id'].split('.')[0] for trigger in ctx.triggered]==['']:
+        raise PreventUpdate
+
     triggered_inputs = [json.loads(trigger['prop_id'].split('.')[0]) for trigger in ctx.triggered]
+    list_id=remove_duplicates([triggered_input['index'] for triggered_input in triggered_inputs])
 
-    #print("Trigger input: ",triggered_inputs)
 
-    #print("Print selectted nodes:",selectedNodes)
-    #node['label'] for node in data
-
-    list_id_buttons=remove_duplicates([triggered_input['index'] for triggered_input in triggered_inputs])
-
-    for button_id in list_id_buttons:
+    if len(list_value_dropdown)==len(store_data):
+        ## All components have triggered the callback
+        for idx,group in enumerate(store_data):
+            group['elements'] = list_value_dropdown[idx]
+            
+    else:
+        ##Only one component has triggered
+        triggered_id=triggered_inputs[0]
         for group in store_data:
-            if group['id'] == button_id:
-                # Just add the elements if they are not already in the group
-                for node in selectedNodes:
-                    group["elements"].append(node["id"])
-                    group["elements"]=list(set(group["elements"])) #Remove duplicates
-            else:
-                for node in selectedNodes:
-                    group["elements"]=[elem for elem in group["elements"] if elem != node["id"]] #Remove possible selected elements
+            if group['id']==triggered_id:
+                #idx=list_id.index(triggered_id)
+                group['elements'] = list_value_dropdown[0] 
+                
+    remaining_taxa=get_list_remaining_taxa(store_data,info_current_file_store)
 
-    #print("Store data apres elements selectionnés: ",store_data)
-    return store_data,None,style_display_none
+    options_dropdown=[]
+    for taxa in remaining_taxa:
+        options_dropdown.append({'label': taxa, 'value': taxa})
 
+    return_list_dropdown_options=[]
+
+    #print('Options dropdown: ',options_dropdown)
+
+    for value_dropdown in list_value_dropdown:
+        others_options=[]
+        for element in value_dropdown:
+            others_options.append({'label': element, 'value': element})
+        #print("Others options: ",others_options)
+        return_list_dropdown_options.append(options_dropdown+others_options)
+
+    #print("Return list dropdown: ",return_list_dropdown_options)
+
+
+    return store_data,return_list_dropdown_options
 
 
 def is_valid_hex_color(hex_color):
@@ -986,3 +936,87 @@ def remove_duplicates(original_list):
             unique_list.append(item)
             seen.add(item)
     return unique_list
+
+def get_list_remaining_taxa(data_legend_store,info_current_file_store):
+    #print('Data legend store: ',data_legend_store)
+    list_remaining_taxa=get_list_taxa(info_current_file_store)[:-1]
+    #print("Toutes les taxa du début: ",list_remaining_taxa)
+    if data_legend_store!=[]:
+        for group in data_legend_store:
+            if len(group["elements"])!=0:
+                for element in group["elements"]:
+                    list_remaining_taxa.remove(element)
+                        
+
+    return list_remaining_taxa
+                    
+def print_legend_store(legend_store):
+    for group in legend_store:
+        print(f"{group["label"]}, color: {group["color"]}, elements: {group["elements"]}")
+
+def create_items(legend_store,remaining_taxa):
+    options_dropdown=[]
+    list_items=[]
+    for taxa in remaining_taxa:
+        options_dropdown.append({'label': taxa, 'value': taxa})
+    
+    for group in legend_store:
+        options_dropdown=[]
+        for taxa in remaining_taxa:
+            options_dropdown.append({'label': taxa, 'value': taxa})
+        for element in group["elements"]:
+            options_dropdown.append({'label': element, 'value': element})
+
+        color_value=group["color"] if is_valid_hex_color(group["color"]) else '#FFFFFF'
+
+        element = html.Div([
+                        html.Div(
+                            id={'type': 'color-box', 'index': group["id"]},
+                            style={'width': '20px', 'height': '20px', 'backgroundColor': color_value, 'margin-left': "1%"}
+                        ),
+                        dcc.Input(
+                            type='text',
+                            placeholder='Enter hex color value',
+                            value=group["color"],
+                            style={'flex': '0 1 10%', 'margin-right': '1%','width': '10%','padding': '8px','border': '1px solid #ccc','borderRadius': '5px','margin': '10px','vertical-align': 'middle'},
+                            id={'type': 'color-input', 'index': group["id"]}
+                        ),
+                        dcc.Input(
+                            type='text',
+                            placeholder='Enter label',
+                            id={'type': 'label-input', 'index': group["id"]},
+                            value=group["label"],
+                            style={'flex': '0 1 15%', 'margin-right': '1%','width': '10%','padding': '8px','border': '1px solid #ccc','borderRadius': '5px','margin': '10px','vertical-align': 'middle',}
+                        ),
+                        html.Div(
+                            style={'flex': '1', 'display': 'flex', 'align-items': 'center'},
+                            children=[
+                                html.H5(
+                                    "Elements associated: ",
+                                    style={"margin": '0 10px 0 0'}
+                                ),
+                                dcc.Dropdown(
+                                    id={'type': 'dropdown-group-items', 'index': group["id"]},
+                                    value=group["elements"],
+                                    options=options_dropdown,
+                                    placeholder="Select elements",
+                                    multi=True,
+                                    style={'flex': '1','margin-right':"3%"},
+                                    persistence=True,
+                                    persistence_type=type_storage,
+                                )
+                            ]
+                        ),
+                        html.I(
+                            className="fas fa-trash",
+                            id={'type': 'trash-icon', 'index': group["id"]},
+                            style={'color': 'red', 'cursor': 'pointer', 'margin': '5px', 'margin-left': 'auto', 'margin-right': '3%'}
+                        ),
+                    ], id=group["id"], style={'width': '90%', 'margin': '0 auto', 'border': '1px solid black', 'border-radius': '10px', 'padding': '10px', 'display': 'flex', 'align-items': 'center', 'margin-top': '5px'})
+        list_items.append(element)
+
+    return list_items
+
+
+def layout_features_selection():
+    return html.H5("Features Selection view")

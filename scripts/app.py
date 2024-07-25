@@ -323,7 +323,6 @@ def close_session():
             timestamps = f.readlines()
             if timestamps:
                 last_time=float(timestamps[-1].strip())
-                print("Diff time111111:",time.time()-last_time)
                 if time.time()-last_time>=20:
                     #Delete and stop everything related to the user session
                     print(f"L'utilisateur a probablement fermé la page {txt_file}")

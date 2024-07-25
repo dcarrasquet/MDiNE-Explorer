@@ -324,6 +324,17 @@ def on_click(filename,contents, info_current_file_store):#data,
 
         info_current_file_store["filename"]=os.path.join(session_folder, filename)
         info_current_file_store["session_folder"]=session_folder
+        info_current_file_store["nb_rows"]=None
+        info_current_file_store["nb_columns"]=None
+        info_current_file_store["covar_start"]=None
+        info_current_file_store["covar_end"]=None
+        info_current_file_store["taxa_start"]=None
+        info_current_file_store["taxa_end"]=None
+        info_current_file_store["reference_taxa"]=None
+        info_current_file_store["phenotype_column"]=None
+        info_current_file_store["first_group"]=None
+        info_current_file_store["filter_zeros"]=None
+        info_current_file_store["filter_dev_mean"]=None
 
         return info_current_file_store#,data
 
@@ -350,8 +361,6 @@ def on_data(output_data,output_df,columns_info,rows_info,ts,info_current_file_st
     if ts is None:
         raise PreventUpdate
     
-    print('Je suis appelé en boucke')
-
     #print('Info current afer reuplod: ',info_current_file_store)
     # data = data or {}
 
@@ -388,6 +397,8 @@ def on_data(output_data,output_df,columns_info,rows_info,ts,info_current_file_st
         return invalid_file,None,infos_columns,infos_rows,True,True,True,True,False,info_current_file_store
     
 def check_df_numeric(df):
+    #print("Dtypes: ",type(df.dtypes))
+    #print(set(df.dtypes.tolist()))
     return df.map(is_numeric).all().all()
 
 def is_numeric(value):
@@ -395,7 +406,7 @@ def is_numeric(value):
         pd.to_numeric(value)
         return True
     except ValueError:
-        print("Error value: ",value)
+        #print("Error value: ",value)
         return False
 
 def create_dash_table(df):
@@ -553,7 +564,8 @@ def on_data(ts_cov,ts_taxa,data_cov,data_taxa,check_ref_taxa,check_separate_data
     options_check_boxes=[{'label': '', 'value': 'checked',"disabled":True}]
 
     if info_current_file_store["filename"]==None or info_current_file_store["nb_columns"]==None:
-        raise PreventUpdate
+        #raise PreventUpdate
+        return info_current_file_store,children_cov,children_cov_info,children_taxa,children_taxa_info,options_check_boxes,options_check_boxes,options_check_boxes,options_check_boxes,check_ref_taxa,check_separate_data,check_filter_zeros,check_filter_dev_mean,True,True,True,True
 
     if ts_cov is None and ts_taxa is None:
         raise PreventUpdate
@@ -629,6 +641,10 @@ def update_dropdown_ref_taxa(value_check,ts_ref_taxa,value_ref_taxa,info_current
 
     else:
         ##Checked
+
+        if info_current_file_store["taxa_start"]==None:
+            raise PreventUpdate
+        
         taxa_list=get_list_taxa(info_current_file_store)
         options=[]
         for taxa_name in taxa_list:
@@ -680,6 +696,8 @@ def update_dropdown_phentype_column(value_check,ts_phenotype_column,value_phenot
         return info_current_file_store,{'display':'none'},False,[],None,[],[]
 
     else:
+        if info_current_file_store["taxa_start"]==None:
+            raise PreventUpdate
         ##Checked
         binary_covariates_list=get_list_binary_covariates(info_current_file_store)
 
@@ -838,10 +856,6 @@ def on_click(value, data):
 
     return data
 
-
-
-
-
 @app.callback(Output("info-current-file-store","data",allow_duplicate=True),
               Output('select-filter-columns-zero', 'style'),
               Output('select-filter-deviation-mean', 'style'),
@@ -860,6 +874,9 @@ def on_click(value, data):
               State('filter-columns-zero-status', 'data'),
               State('info-current-file-store','data'),prevent_initial_call=True)
 def get_changes_filters(check_dev_mean,check_zeros,ts_dev_mean,ts_zeros,data_dev_mean,data_zeros,info_current_file_store):
+
+    if info_current_file_store["taxa_start"]==None:
+        raise PreventUpdate
 
     style_not_displayed={'display': 'none','vertical-align': 'middle'}
     style_displayed={'vertical-align': 'middle'}
@@ -897,13 +914,11 @@ def get_changes_filters(check_dev_mean,check_zeros,ts_dev_mean,ts_zeros,data_dev
         info_current_file_store["filter_dev_mean"]=filter_dev_mean
         info_filter=get_df_taxa(info_current_file_store,"info")
 
-        #print("Info filter3: ",info_filter)
-
         output_dev_mean=html.H5(f"{info_filter["dev-mean-deleted"]} taxa deleted",style={'display': 'inline-block'})
         info_dev_mean=html.H5(f"Filter with deviation/mean ratio: {info_filter["dev-mean-deleted"]} taxa deleted",style={"text-indent": '15px'})
         summary_filter=html.H5(f"Summary: {info_filter["remaining-taxa"]} taxa remaining",style={'display': 'inline-block',"text-indent": '15px'})
 
-        return info_current_file_store,style_not_displayed,style_displayed,output_dev_mean,None,None,info_dev_mean,summary_filter,info_filter["taxa-init"]-info_filter["dev-mean-deleted"],min(filter_dev_mean,info_filter["taxa-init"]-info_filter["dev-mean-deleted"])
+        return info_current_file_store,style_not_displayed,style_displayed,output_dev_mean,None,None,info_dev_mean,summary_filter,info_filter["taxa-init"]-info_filter["zeros-deleted"],min(filter_dev_mean,info_filter["taxa-init"]-info_filter["dev-mean-deleted"])
     else:
         #Filter on zeros percent and dev mean activated at the same time
 
