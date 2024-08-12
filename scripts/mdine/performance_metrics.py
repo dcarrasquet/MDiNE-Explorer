@@ -1,4 +1,3 @@
-import pickle
 import arviz as az
 #import matplotlib.pyplot as plt
 import numpy as np
@@ -6,12 +5,13 @@ import math
 import json
 from scipy.stats import gamma, norm
 from scipy.stats import gaussian_kde
+import pandas as pd
 
 import plotly.graph_objects as go
 
 import matplotlib
 import matplotlib.pyplot as plt
-matplotlib.use('Agg')
+#matplotlib.use('Agg')
 
 def get_energy_figure(idata):
     fig, ax = plt.subplots(figsize=(6, 4))
@@ -185,12 +185,92 @@ def get_trace_precision_matrix(idata):
         print(f"Error generating plot: {e}")
         return None
     
-def get_rhat_and_ess():
+def get_autocorr(idata):
+    result=az.plot_autocorr(idata,var_names=['precision_matrix'],combined=True)
+    #result=az.plot_autocorr(idata,var_names=['lambda_mdine'],combined=True)
+    print("Coucouc")
+    print(type(result))
+    plt.show()
+    #return None
 
-    filename=f"data/dash_app/session_5/idata.pkl"
-    with open(filename, "rb") as file:
-        idata = pickle.load(file)
-    # print("Rhat:",az.rhat(idata,var_names="beta_matrix").beta_matrix)
-    # print("ESS:",az.ess(idata,var_names="beta_matrix").beta_matrix)
-    print("Rhat:",az.rhat(idata,var_names="precision_matrix").precision_matrix)
-    print("ESS:",az.ess(idata,var_names="precision_matrix").precision_matrix)
+def get_list_variables_idata(idata):
+    variables_posterior = idata.posterior.data_vars
+    #print("Variables dans le groupe 'posterior':", list(variables_posterior))
+    return list(variables_posterior)
+
+def get_rhat(idata,list_variables):
+    rhats = {}
+    for var in list_variables:
+        if var in idata.posterior:
+            rhat_data = az.rhat(idata.posterior[var])
+            rhats[var] = rhat_data
+        else:
+            print(f"La variable {var} n'existe pas dans les données.")
+    return rhats
+    
+def get_rhat_and_ess(idata,List_variable):
+
+    filename=f"data/dash_app/session_45/idata.nc"
+    idata=az.from_netcdf(filename)
+
+    #az.rhat(idata,var_names=variable_name)
+
+    #print("Rhat:",az.rhat(idata,var_names="beta_matrix").beta_matrix)
+    #print("Rhat:",az.rhat(idata,var_names="precision_matrix").precision_matrix)
+    #print("Rhat:",az.rhat(idata))
+    #print("ESS:",az.ess(idata,var_names="beta_matrix").beta_matrix)
+    # print("Rhat:",az.rhat(idata,var_names="precision_matrix").precision_matrix)
+    # print("ESS:",az.ess(idata,var_names="precision_matrix").precision_matrix)
+    # Calculer les valeurs de R-hat
+    rhat_values = az.rhat(idata)
+
+    #print(rhat_values)
+
+        # Initialiser une liste pour les paramètres problématiques
+    problematic_params = []
+
+    # Parcourir les valeurs de R-hat
+    for param, rhat in rhat_values.items():
+        # Convertir les valeurs en numpy array pour faciliter la comparaison
+        print(type(rhat))
+        rhat_array = np.asarray(rhat)
+        print(param)
+        print("Array: ")
+        print(rhat_array)
+        
+        # Vérifier si toutes les valeurs de R-hat sont supérieures à 1.1
+        if np.any(rhat_array > 1.1):
+            problematic_params.append((param, rhat_array))
+
+    # Afficher les paramètres problématiques
+    if problematic_params:
+        print("Paramètres avec R-hat > 1.1:")
+        for param, rhat in problematic_params:
+            print(f"Paramètre: {param}, R-hat: {rhat}")
+    else:
+        print("Toutes les chaînes semblent avoir convergé (R-hat <= 1.1).")
+
+    # Convertir les résultats en DataFrame pour une manipulation plus facile
+    #rhat_df = rhat_values.to_dataframe()
+
+    #print(rhat_df)
+
+    # # Filtrer les paramètres avec R-hat > 1.1
+    # problematic_params = rhat_df[rhat_df[0] > 1.1]
+
+    # # Afficher les paramètres problématiques
+    # print("Paramètres avec R-hat > 1.1:")
+    # print(problematic_params)
+
+    # # Si tu veux juste les noms des paramètres
+    # param_names = problematic_params['variable'].tolist()
+    # print("Noms des paramètres avec R-hat > 1.1:")
+    # print(param_names)
+
+
+if __name__=="__main__":
+
+    filename=f"data/dash_app/session_44/idata.nc"
+    idata=az.from_netcdf(filename)
+    #get_autocorr(idata)
+    #get_rhat_and_ess()

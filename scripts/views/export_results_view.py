@@ -25,12 +25,12 @@ button_style = {
     'hover': button_hover_style
 }
 
-def layout_export_results(info_current_file_store):
-    if info_current_file_store["status-run-model"]=="not-yet":
+def layout_export_results(status_run_model):
+    if status_run_model=="not-yet":
         return html.H5("The inference has not been launched. Press Run model in the Model tab to download futur results.")
-    elif info_current_file_store["status-run-model"]=="in-progress":
+    elif status_run_model=="in-progress":
         return html.H5("The model is running. You can view the current status in the Model tab. Come back later to download the results")
-    elif info_current_file_store["status-run-model"]=="completed":
+    elif status_run_model=="completed":
         return make_real_layout()
     else:
         raise ValueError
@@ -52,18 +52,13 @@ def make_real_layout():
     Output("download", "data"),
     Input("download-button", "n_clicks"),
     State("info-current-file-store","data"),
+    State("status-run-model","data"),
     prevent_initial_call=True
 )
-# def download_file(n_clicks):
-#     # Chemin vers le fichier à télécharger
-#     FILE_PATH = "data/dash_app/session_7/first_group/idata.pkl"
-#     NEW_FILENAME = "nouveau_idata.pkl"  # Nom de fichier personnalisé
-    
 
-#     return dcc.send_file(FILE_PATH,filename=NEW_FILENAME)
-def download_file(n_clicks,info_current_file_store):
+def download_file(n_clicks,info_current_file_store,status_run_model):
 
-    if info_current_file_store["status-run-model"]!="completed":
+    if status_run_model!="completed":
         raise PreventUpdate
     
     two_groups=info_current_file_store["second_group"]
@@ -72,11 +67,11 @@ def download_file(n_clicks,info_current_file_store):
    
     if two_groups!=None:
         #Two groups
-        list_files.append(os.path.join(info_current_file_store["session_folder"],"first_group","idata.pkl"))
-        list_files.append(os.path.join(info_current_file_store["session_folder"],"second_group","idata.pkl"))
+        list_files.append(os.path.join(info_current_file_store["session_folder"],"first_group","idata.nc"))
+        list_files.append(os.path.join(info_current_file_store["session_folder"],"second_group","idata.nc"))
 
     else:
-        list_files.append(os.path.join(info_current_file_store["session_folder"],"idata.pkl"))
+        list_files.append(os.path.join(info_current_file_store["session_folder"],"idata.nc"))
 
             
 

@@ -6,7 +6,7 @@ def get_separate_data(info_current_file):
     else:
         df_init=get_df_file(info_current_file)
         df_taxa=get_df_taxa(info_current_file,"df_taxa")
-        df_covariates=get_df_covariates(info_current_file)
+        df_covariates=get_df_covariates(info_current_file,"reduced")
 
         # df_taxa_1=df_taxa[df_init.iloc[:,info_current_file["phenotype_column"]-1]==0]
         # df_taxa_2=df_taxa[df_init.iloc[:,info_current_file["phenotype_column"]-1]==1]
@@ -23,7 +23,7 @@ def get_df_taxa(info_current_file,type_output):
     start_taxa=info_current_file["taxa_start"]
     end_taxa=info_current_file["taxa_end"]
     #No filters
-    df_total=get_df_file(info_current_file).iloc[:,start_taxa-1:end_taxa+1]
+    df_total=get_df_file(info_current_file).iloc[:,start_taxa-1:end_taxa]
 
     reference_taxa=info_current_file["reference_taxa"]
 
@@ -79,10 +79,15 @@ def get_df_taxa(info_current_file,type_output):
     else:
         return("error")
 
-def get_df_covariates(info_current_file):
+def get_df_covariates(info_current_file,type):
+    ## Type reduced or all
     start_cov=info_current_file["covar_start"]
     end_cov=info_current_file["covar_end"]
-    return get_df_file(info_current_file).iloc[:,start_cov-1:end_cov]
+    if type=="all" or info_current_file["phenotype_column"]==None or info_current_file["phenotype_column"]=="error":
+        return get_df_file(info_current_file).iloc[:,start_cov-1:end_cov]
+    else:
+        df_all_covariates=get_df_file(info_current_file).iloc[:,start_cov-1:end_cov]
+        return df_all_covariates.drop(columns=[info_current_file["phenotype_column"]])
 
 def get_infos_file(filename):
     file_extention=filename.split(".")[-1]
@@ -149,10 +154,10 @@ def find_reference_taxa(info_current_file,reference_column=None):
     if reference_column==None:
 
         mean_values = df_taxa.mean()
-        deviation_values = df_taxa.var()
+        #deviation_values = df_taxa.var()
 
-        ratios=deviation_values/mean_values
-        sorted_taxa = ratios.sort_values(ascending=True)
+        #ratios=deviation_values/mean_values
+        sorted_taxa = mean_values.sort_values(ascending=False)
         reference_column = sorted_taxa.head(1).index
 
         #print(reference_column[0])
@@ -196,8 +201,12 @@ def get_list_taxa(info_current_file_store):
     df=get_df_taxa(info_current_file_store,"df_taxa")
     return(list(df.columns))
 
+def get_list_covariates(info_current_file_store):
+    df=get_df_covariates(info_current_file_store,"reduced")
+    return (list(df.columns))
+
 def get_list_binary_covariates(info_current_file_store):
-    df=get_df_covariates(info_current_file_store)
+    df=get_df_covariates(info_current_file_store,"all")
     covariate_names=list(df.columns)
 
     list_binary_covariates=[]

@@ -4,12 +4,12 @@ import pytensor.tensor.shape
 import pytensor
 import pytensor.tensor as pt
 import pymc.math
-import pickle
 import math
 import numpy as np
 from pytensor.tensor.linalg import inv as matrix_inverse
 import json
 import os
+import arviz as az
 
 import sys
     
@@ -27,7 +27,7 @@ def run_model(covariate_matrix_data,counts_matrix_data,simulation,folder):
     # print("Simulation: ",simulation)
 
     beta_matrix_choice=simulation["beta_matrix"]["apriori"]
-    parameters_beta_matrix=simulation["beta_matrix"]["parameters"]
+    parameters_beta_matrix=simulation["beta_matrix"].get("parameters",None)
 
     precision_matrix_choice=simulation["precision_matrix"]["apriori"]
     parameters_precision_matrix=simulation["precision_matrix"]["parameters"]
@@ -49,7 +49,7 @@ def run_model(covariate_matrix_data,counts_matrix_data,simulation,folder):
 
         elif beta_matrix_choice=="Ridge":
             
-            lambda_ridge=pm.Gamma("lambda_brige",alpha=parameters_beta_matrix["alpha"],beta=parameters_beta_matrix["beta"],shape=(k_covariates,j_taxa))
+            lambda_ridge=pm.Gamma("lambda_ridge",alpha=parameters_beta_matrix["alpha"],beta=parameters_beta_matrix["beta"],shape=(k_covariates,j_taxa))
             beta_matrix=pm.Normal("beta_matrix",mu=0,tau=lambda_ridge,shape=(k_covariates,j_taxa))
 
         elif beta_matrix_choice=="Lasso":
@@ -68,10 +68,14 @@ def run_model(covariate_matrix_data,counts_matrix_data,simulation,folder):
             beta_matrix=pm.Normal("beta_matrix",mu=0,sigma=sigma_square*tau_matrix)
 
         elif beta_matrix_choice=="Horseshoe":
-            tau=pm.HalfCauchy("tau",beta=parameters_beta_matrix["beta_tau"])
-            lambda_horseshoe=pm.HalfCauchy("lambda_horseshoe",beta=tau,shape=(k_covariates,j_taxa))
+            # tau=pm.HalfCauchy("tau",beta=parameters_beta_matrix["beta_tau"])
+            # lambda_horseshoe=pm.HalfCauchy("lambda_horseshoe",beta=tau,shape=(k_covariates,j_taxa))
 
-            beta_matrix=pm.Normal("beta_matrix",mu=0,sigma=lambda_horseshoe)
+            # beta_matrix=pm.Normal("beta_matrix",mu=0,sigma=lambda_horseshoe)
+            tau=pm.HalfCauchy("tau",beta=1)
+            lambda_horseshoe=pm.HalfCauchy("lambda_horseshoe",beta=1,shape=(k_covariates,j_taxa))
+
+            beta_matrix=pm.Normal("beta_matrix",mu=0,sigma=lambda_horseshoe*tau)
         
         elif beta_matrix_choice=="Spike_and_slab":
             #proba_gamma=0.5 # Eventually pm.beta
@@ -159,17 +163,17 @@ def run_model(covariate_matrix_data,counts_matrix_data,simulation,folder):
     
         ## Covariate matrix, allows it to be displayed on the graph.
 
-        #covariate_matrix=pm.Deterministic("X_covariates",pytensor.tensor.as_tensor_variable(covariate_matrix_data))
+        
         covariate_matrix=pytensor.tensor.as_tensor_variable(covariate_matrix_data)
 
-        #product_X_Beta=pm.Deterministic("Product_X_Beta",covariate_matrix@beta_matrix)
+        
         product_X_Beta=covariate_matrix@beta_matrix
 
         # Matrix W, Normal distribution
         w_matrix=pm.MvNormal("w_matrix",mu=product_X_Beta,tau=precision_matrix)
+        #w_matrix=pm.MvNormal("w_matrix",mu=product_X_Beta,cov=precision_matrix)
         
         #Proportions Matrix, Deterministic with Softmax
-        #proportions_matrix=pm.Deterministic("proportions_matrix",pymc.math.softmax(pymc.math.concatenate([w_matrix,pt.zeros(shape=(n_individuals,1))],axis=1),axis=1))
         proportions_matrix=pymc.math.softmax(pymc.math.concatenate([w_matrix,pt.zeros(shape=(n_individuals,1))],axis=1),axis=1)
 
         liste_sum_counts = counts_matrix_data.sum(axis=1).tolist()
@@ -180,13 +184,12 @@ def run_model(covariate_matrix_data,counts_matrix_data,simulation,folder):
 
     with mdine_model:
         #mdine_model.debug()
-        idata = pm.sample(1000) ## 10000 normally
+        idata = pm.sample(1000,init='auto') ## 10000 normally
 
     if idata!=None:
-        print("Folder: ",folder)
-        with open(folder+"idata.pkl", "wb") as f: #Potentialy modify the name of the file depending on the parameters of the simulation
-            pickle.dump(idata, f)
-            print("Fichier écrit avec succès!")
+        az.to_netcdf(idata, os.path.join(folder,"idata.nc"))
+        print("Inference successfully completed")
+
 
 def make_precision_matrix(coef_diag,coef_off_diag,j_taxa):
 
@@ -272,7 +275,7 @@ def run_model_terminal():
     if info_current_file_store["phenotype_column"]==None:
         #Only one group
         print("Start Inference")  
-        df_covariates=get_df_covariates(info_current_file_store)
+        df_covariates=get_df_covariates(info_current_file_store,"reduced")
         df_taxa=get_df_taxa(info_current_file_store,"df_taxa")
         run_model(df_covariates,df_taxa,info_current_file_store["parameters_model"],info_current_file_store["session_folder"])
 
@@ -288,9 +291,9 @@ def run_model_terminal():
         print("Start second inference")
         run_model(df_covariates_2,df_taxa_2,info_current_file_store["parameters_model"],path_second_group)
 
+
 if __name__=="__main__":
     run_model_terminal()
-    
 
 
     

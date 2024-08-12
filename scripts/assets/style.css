@@ -69,6 +69,26 @@
     cursor: not-allowed;
 }
 
+#clear-all-data-button {
+    background: #dc3545;
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    /* margin: 10px; */
+    display:inline-block;
+    vertical-align: middle;
+    /* margin: 0 10px */
+    /* margin-left: 'auto';
+    margin-right: 'auto'; */
+    margin:auto;
+}
+
+#clear-all-data-button:hover {
+    background: #e05260; /* You can define a hover style if needed */
+}
+
 
 
 /* assets/styles.css */

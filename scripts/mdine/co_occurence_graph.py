@@ -2,16 +2,108 @@
 import arviz as az
 import numpy as np
 from math import cos,sin,sqrt,pi
+from collections import Counter, defaultdict
+import networkx as nx
+import os
+
+def analyse_gml_co_occurence_network(filename_gml):
+    G = nx.read_gml(filename_gml)
+
+def get_gml_co_occurence_network(idata,df_taxa,legend_store,hdi,filename_gml):
+    G = nx.Graph()
+
+    taxa_list= df_taxa.columns.tolist()[:-1]
+    j_taxa=len(taxa_list)
+    counts_mean=df_taxa.mean(axis=0).tolist()[:-1]
+    mean_total_counts=np.mean(counts_mean)
+    correction_size=100/mean_total_counts
+    dict_element_color=get_dict_element_color(legend_store)
+
+    hdi_precision_matrix = az.hdi(idata, var_names=["precision_matrix"], hdi_prob=hdi).precision_matrix.values
+    precision_matrix=idata.posterior.precision_matrix.mean(dim=["chain", "draw"])
+    correlation_matrix=np.zeros((j_taxa,j_taxa))
+    for i in range (j_taxa):
+        for j in range (j_taxa):
+            correlation_matrix[i,j]=precision_matrix[i,j]/(sqrt(precision_matrix[i,i]*precision_matrix[j,j]))
+
+    for i in range (j_taxa):
+        G.add_node(taxa_list[i], color=dict_element_color.get(taxa_list[i],'#e5e5e5'), size=correction_size*counts_mean[i])
+        for j in range(i):
+            #Update Edges properties
+            lower_hdi=hdi_precision_matrix[i][j][0]
+            higher_hdi=hdi_precision_matrix[i][j][1]
+
+            if round(float(lower_hdi),3)*round(float(higher_hdi),3)>=0:
+            
+                #Same sign, do not contains null value. Create edge
+                coefficient = correlation_matrix[i, j]
+                color_edge = '#18B532' if coefficient > 0 else '#E22020'
+                G.add_edge(taxa_list[i], taxa_list[j], color=color_edge, type='solid',width=abs(coefficient))
+    
+    nx.write_gml(G, filename_gml)
+
+def get_gml_diff_network(idata1,df_taxa1,idata2,df_taxa2,hdi,filename_gml):
+    G = nx.Graph()
+
+    hdi_precision_matrix1 = az.hdi(idata1, var_names=["precision_matrix"], hdi_prob=hdi).precision_matrix.values
+    hdi_precision_matrix2 = az.hdi(idata2, var_names=["precision_matrix"], hdi_prob=hdi).precision_matrix.values
+
+    precision_matrix1=idata1.posterior.precision_matrix.mean(dim=["chain", "draw"])
+    precision_matrix2=idata2.posterior.precision_matrix.mean(dim=["chain", "draw"])
+
+    taxa_list= df_taxa1.columns.tolist()[:-1]
+
+    counts_mean1=df_taxa1.mean(axis=0).tolist()[:-1]
+    counts_mean2=df_taxa2.mean(axis=0).tolist()[:-1]
+    
+    j_taxa=len(counts_mean1)
+   
+
+    correlation_matrix1=np.zeros((j_taxa,j_taxa))
+    correlation_matrix2=np.zeros((j_taxa,j_taxa))
+
+    for i in range (j_taxa):
+        for j in range (j_taxa):
+            correlation_matrix1[i,j]=precision_matrix1[i,j]/(sqrt(precision_matrix1[i,i]*precision_matrix1[j,j]))
+            correlation_matrix2[i,j]=precision_matrix2[i,j]/(sqrt(precision_matrix2[i,i]*precision_matrix2[j,j]))
+
+
+    for i in range (j_taxa):
+        if counts_mean2[i]>=counts_mean1[i]:
+            #Higher in Second Group
+            #Green nodes
+            color_node='#00ff00'
+        else:
+            #Red nodes
+            color_node='#ff0000'
+        G.add_node(taxa_list[i], color=color_node, size=10)
+        for j in range(i):
+            #Update Edges properties
+            lower_hdi1=hdi_precision_matrix1[i][j][0]
+            higher_hdi1=hdi_precision_matrix1[i][j][1]
+            lower_hdi2=hdi_precision_matrix2[i][j][0]
+            higher_hdi2=hdi_precision_matrix2[i][j][1]
+
+            if min(higher_hdi1,higher_hdi2)<max(lower_hdi1,lower_hdi2):
+                #Intervals overlap, so significant difference
+                if abs(correlation_matrix2[i,j])>=abs(correlation_matrix1[i,j]):
+                    G.add_edge(taxa_list[i], taxa_list[j], type='dashed')
+                else:
+                    G.add_edge(taxa_list[i], taxa_list[j], type='solid')
+    
+    nx.write_gml(G, filename_gml)
+            
 
 def get_elements_co_occurence_network(df_taxa,legend_store):
+    #print("On m'appelle souvent elements")
     elements=[]
     taxa_list= df_taxa.columns.tolist()[:-1]
     nb_species=len(taxa_list)
 
     ## Construction of the circular layout
-    x_circle=700
-    y_circle=250
-    radius=200
+    x_circle=0
+    y_circle=0
+    radius=300
 
 
     for i in range (nb_species):
@@ -22,13 +114,13 @@ def get_elements_co_occurence_network(df_taxa,legend_store):
             elements.append({'data': {'source': taxa_list[i], 'target': taxa_list[j]}})
 
     # Add legend elements
-    elements_legend=get_legend_element(legend_store)
+    elements_legend=get_legend_element(legend_store,x_circle-2.5*radius,y_circle)
     for el in elements_legend:
         elements.append(el)
     
     return elements
 
-def get_legend_element(legend_store):
+def get_legend_element(legend_store,x_origin,y_origin):
 
     #print("Legend store: ",legend_store)
 
@@ -37,32 +129,32 @@ def get_legend_element(legend_store):
     space_between_nodes=25
 
     if legend_store==[]:
-        node={'data': {'id': "group_default", 'label': "Species", 'parent': 'legend_parent'}, 'classes': 'normal-network','grabbable': False,'position': {'x': 0, 'y': 0}}#,'locked': True
+        node={'data': {'id': "group_default", 'label': "Species", 'parent': 'legend_parent'}, 'classes': 'normal-network','grabbable': False,'position': {'x': x_origin, 'y': y_origin}}#,'locked': True
         legend.append(node)
-        pos_asso= {'data': {'id': 'positive_association', 'label': 'Positive Association', 'parent': 'legend_parent'}, 'classes': 'normal-network','grabbable': False,'position': {'x': 0, 'y': space_between_nodes}}#,'locked': True
-        neg_asso= {'data': {'id': 'negative_association', 'label': 'Negative Association', 'parent': 'legend_parent'}, 'classes': 'normal-network','grabbable': False,'position': {'x': 0, 'y': 2*space_between_nodes}}#,'locked': True
+        pos_asso= {'data': {'id': 'positive_association', 'label': 'Positive Association', 'parent': 'legend_parent'}, 'classes': 'normal-network','grabbable': False,'position': {'x': x_origin, 'y': y_origin+space_between_nodes}}#,'locked': True
+        neg_asso= {'data': {'id': 'negative_association', 'label': 'Negative Association', 'parent': 'legend_parent'}, 'classes': 'normal-network','grabbable': False,'position': {'x': x_origin, 'y': y_origin+2*space_between_nodes}}#,'locked': True
         legend.append(pos_asso)
         legend.append(neg_asso)
     else:
         for idx,group in enumerate(legend_store):
             #print("Group Label: ",group["label"],"Index ",idx)
-            node={'data': {'id': group["id"], 'label': group["label"], 'parent': 'legend_parent'}, 'classes': 'normal-network','grabbable': False,'position': {'x': 0, 'y': idx*space_between_nodes}}#,'locked': True
+            node={'data': {'id': group["id"], 'label': group["label"], 'parent': 'legend_parent'}, 'classes': 'normal-network','grabbable': False,'position': {'x': x_origin, 'y': y_origin+idx*space_between_nodes}}#,'locked': True
             legend.append(node)
 
         nb_species=len(legend_store)
-        pos_asso= {'data': {'id': 'positive_association', 'label': 'Positive Association', 'parent': 'legend_parent'}, 'classes': 'normal-network','grabbable': False,'position': {'x': 0, 'y': (nb_species)*space_between_nodes}}#,'locked': True
-        neg_asso= {'data': {'id': 'negative_association', 'label': 'Negative Association', 'parent': 'legend_parent'}, 'classes': 'normal-network','grabbable': False,'position': {'x': 0, 'y': (nb_species+1)*space_between_nodes}}#,'locked': True
+        pos_asso= {'data': {'id': 'positive_association', 'label': 'Positive Association', 'parent': 'legend_parent'}, 'classes': 'normal-network','grabbable': False,'position': {'x': x_origin, 'y': y_origin+(nb_species)*space_between_nodes}}#,'locked': True
+        neg_asso= {'data': {'id': 'negative_association', 'label': 'Negative Association', 'parent': 'legend_parent'}, 'classes': 'normal-network','grabbable': False,'position': {'x': x_origin, 'y': y_origin+(nb_species+1)*space_between_nodes}}#,'locked': True
         legend.append(pos_asso)
         legend.append(neg_asso)
 
     #Legend for differentiel co-occurence-network
     width_edges=30
     legend.append({'data': {'id': 'legend_diff_parent', 'label': 'Legend'}, 'classes': 'diff-network'})
-    green_node= {'data': {'id': 'green_diff_node', 'label': 'Higher in second group', 'parent': 'legend_diff_parent'}, 'classes': 'diff-network','grabbable': False,'position': {'x': 0, 'y': 0}}#,'locked': True
-    red_node= {'data': {'id': 'red_diff_node', 'label': 'Lower in second group', 'parent': 'legend_diff_parent'}, 'classes': 'diff-network','grabbable': False,'position': {'x': 0, 'y': space_between_nodes}}#,'locked': True
-    dashed_edge1= {'data': {'id': 'dashed_edge1', 'label': 'Second group abs association stronger', 'parent': 'legend_diff_parent'}, 'classes': 'diff-network','grabbable': False,'position': {'x': width_edges/6-width_edges/2, 'y': 2*space_between_nodes}}#,'locked': True
-    dashed_edge2= {'data': {'id': 'dashed_edge2', 'label': 'Second group abs association stronger', 'parent': 'legend_diff_parent'}, 'classes': 'diff-network','grabbable': False,'position': {'x': -width_edges/6+width_edges/2, 'y': 2*space_between_nodes}}#,'locked': True
-    line_full_edge= {'data': {'id': 'line_full_edge', 'label': 'First group abs association stronger', 'parent': 'legend_diff_parent'}, 'classes': 'diff-network','grabbable': False,'position': {'x': 0, 'y': 3*space_between_nodes}}#,'locked': True
+    green_node= {'data': {'id': 'green_diff_node', 'label': 'Higher in second group', 'parent': 'legend_diff_parent'}, 'classes': 'diff-network','grabbable': False,'position': {'x': x_origin, 'y': y_origin}}#,'locked': True
+    red_node= {'data': {'id': 'red_diff_node', 'label': 'Lower in second group', 'parent': 'legend_diff_parent'}, 'classes': 'diff-network','grabbable': False,'position': {'x': x_origin, 'y': y_origin+space_between_nodes}}#,'locked': True
+    dashed_edge1= {'data': {'id': 'dashed_edge1', 'label': 'Second group abs association stronger', 'parent': 'legend_diff_parent'}, 'classes': 'diff-network','grabbable': False,'position': {'x': x_origin+width_edges/6-width_edges/2, 'y':y_origin+ 2*space_between_nodes}}#,'locked': True
+    dashed_edge2= {'data': {'id': 'dashed_edge2', 'label': 'Second group abs association stronger', 'parent': 'legend_diff_parent'}, 'classes': 'diff-network','grabbable': False,'position': {'x':x_origin-width_edges/6+width_edges/2, 'y':y_origin +2*space_between_nodes}}#,'locked': True
+    line_full_edge= {'data': {'id': 'line_full_edge', 'label': 'First group abs association stronger', 'parent': 'legend_diff_parent'}, 'classes': 'diff-network','grabbable': False,'position': {'x': x_origin, 'y': y_origin+3*space_between_nodes}}#,'locked': True
 
     legend.append(green_node)
     legend.append(red_node)
@@ -74,15 +166,27 @@ def get_legend_element(legend_store):
 
 def get_stylesheet_co_occurrence_network(idata,df_taxa,legend_store,hdi,node_size,edge_width,font_size):
 
+    print("On m'appelle souvent stylesheet")
+
+    count_edges=0
+
     #print("Credibility: ",hdi)
+    
 
     hdi_precision_matrix = az.hdi(idata, var_names=["precision_matrix"], hdi_prob=hdi).precision_matrix
 
     precision_matrix=idata.posterior.precision_matrix.mean(dim=["chain", "draw"])
+    #print(precision_matrix)
     counts_mean=df_taxa.mean(axis=0).tolist()[:-1]
     taxa_list= df_taxa.columns.tolist()[:-1]
 
+    #print(precision_matrix)
+
+    mean_total_counts=np.mean(counts_mean)
+    correction_size=node_size/mean_total_counts
+
     j_taxa=len(counts_mean)
+    #print("NB Taxa: ",j_taxa)
     # Correlation Matrix
     correlation_matrix=np.zeros((j_taxa,j_taxa))
 
@@ -99,8 +203,8 @@ def get_stylesheet_co_occurrence_network(idata,df_taxa,legend_store,hdi,node_siz
         'style': {
             'background-color': dict_element_color.get(taxa_list[i],'#e5e5e5'),
             'label': 'data(label)',
-            'width': node_size*counts_mean[i],
-            'height': node_size*counts_mean[i],
+            'width': correction_size*counts_mean[i],
+            'height': correction_size*counts_mean[i],
             'color': 'black',
             'text-valign': 'center',
             'text-halign': 'center',
@@ -115,7 +219,9 @@ def get_stylesheet_co_occurrence_network(idata,df_taxa,legend_store,hdi,node_siz
             lower_hdi=hdi_precision_matrix[i][j][0]
             higher_hdi=hdi_precision_matrix[i][j][1]
 
-            if lower_hdi*higher_hdi>=0:
+            if round(float(lower_hdi),3)*round(float(higher_hdi),3)>=0:
+
+                count_edges+=1
             
                 #Same sign, do not contains null value. Create edge
                 coefficient = correlation_matrix[i, j]
@@ -150,10 +256,116 @@ def get_stylesheet_co_occurrence_network(idata,df_taxa,legend_store,hdi,node_siz
     style_elements_legend=get_legend_style(legend_store,'normal-network')
     for el in style_elements_legend:
         stylesheet.append(el)
+
+    print("Compte total edges: ",count_edges)
     
     return stylesheet
 
+def get_informations_diff_network(idata1,df_taxa1,idata2,df_taxa2,hdi):
+    taxa_list= df_taxa1.columns.tolist()[:-1]
+    hdi_precision_matrix1 = az.hdi(idata1, var_names=["precision_matrix"], hdi_prob=hdi).precision_matrix
+    hdi_precision_matrix2 = az.hdi(idata2, var_names=["precision_matrix"], hdi_prob=hdi).precision_matrix
+
+    precision_matrix1=idata1.posterior.precision_matrix.mean(dim=["chain", "draw"])
+    precision_matrix2=idata2.posterior.precision_matrix.mean(dim=["chain", "draw"])
+
+    counts_mean1=df_taxa1.mean(axis=0).tolist()[:-1]
+    counts_mean2=df_taxa2.mean(axis=0).tolist()[:-1]
+
+
+    j_taxa=len(taxa_list)
+
+    nb_green_nodes=0
+    nb_red_nodes=0
+    dashed_edges=0
+    solid_edges=0
+
+    dict_number_color={
+        "nodes":{
+            1:"red", #Higher in first group
+            2:"green" #Higher in second group
+        },
+        "edges":{
+            1:"full", #Abs Higher for the first group
+            2:"dashed" #Abs Higher for the second group
+        }
+    }
+
+    list_color_nodes=[]
+    graph_matrix=np.zeros((j_taxa, j_taxa))
+
+    for i in range(j_taxa):
+        if counts_mean2[i]>=counts_mean1[i]:
+            #Higher in Second Group
+            #Green nodes
+            list_color_nodes.append(2)
+        else:
+            #Red nodes
+            list_color_nodes.append(1)
+        
+        for j in range(i):
+            #Update Edges properties
+            lower_hdi1=hdi_precision_matrix1[i][j][0]
+            higher_hdi1=hdi_precision_matrix1[i][j][1]
+            lower_hdi2=hdi_precision_matrix2[i][j][0]
+            higher_hdi2=hdi_precision_matrix2[i][j][1]
+
+            if min(higher_hdi1,higher_hdi2)>=max(lower_hdi1,lower_hdi2):
+                #Intervals overlap, so difference not significant
+                pass
+            else:
+                if abs(precision_matrix2[i,j])>=abs(precision_matrix1[i,j]):
+                    #Abs Higher for the second group
+                    graph_matrix[i][j]=2
+                    graph_matrix[j][i]=2
+                else:
+                    graph_matrix[i][j]=1
+                    graph_matrix[j][i]=1
+
+    node_colors = [dict_number_color['nodes'][color] for color in list_color_nodes]
+    edge_types = {1: dict_number_color['edges'][1], 2: dict_number_color['edges'][2]}
+
+    # Distribution des couleurs des nœuds
+    color_distribution = Counter(node_colors)
+    
+    # Distribution des types d'arêtes
+    edge_type_distribution = Counter(graph_matrix.flatten())
+    edge_type_distribution.pop(0, None)  # Retirer les zéros (absence d'arête)
+    edge_type_distribution = {edge_types[key]: val for key, val in edge_type_distribution.items()}
+    
+    # Calcul du degré des nœuds
+    degree = np.sum(graph_matrix != 0, axis=1)
+    
+    # Assortativité des couleurs des nœuds (très simplifié)
+    same_color_edges = 0
+    total_edges = 0
+
+    for i in range(j_taxa):
+        for j in range(i):
+            if graph_matrix[i, j] != 0:
+                total_edges += 1
+                if list_color_nodes[i] == list_color_nodes[j]:
+                    same_color_edges += 1
+
+    assortativity_color = same_color_edges / total_edges if total_edges > 0 else 0
+
+    result={
+        "color_distribution": color_distribution,
+        "edge_type_distribution": edge_type_distribution,
+        "degree_distribution": dict(Counter(degree)),
+        "assortativity_color": assortativity_color
+    }
+
+    print(result)
+    
+    return result
+
+
+
+
 def get_stylesheet_diff_network(idata1,df_taxa1,idata2,df_taxa2,legend_store,hdi,node_size,edge_width,font_size):
+
+    count_edges=0
 
     hdi_precision_matrix1 = az.hdi(idata1, var_names=["precision_matrix"], hdi_prob=hdi).precision_matrix
     hdi_precision_matrix2 = az.hdi(idata2, var_names=["precision_matrix"], hdi_prob=hdi).precision_matrix
@@ -166,7 +378,7 @@ def get_stylesheet_diff_network(idata1,df_taxa1,idata2,df_taxa2,legend_store,hdi
     counts_mean1=df_taxa1.mean(axis=0).tolist()[:-1]
     counts_mean2=df_taxa2.mean(axis=0).tolist()[:-1]
 
-    total_count_mean=sum(counts_mean1 + counts_mean2) / (len(counts_mean1) + len(counts_mean2))
+    #total_count_mean=sum(counts_mean1 + counts_mean2) / (len(counts_mean1) + len(counts_mean2))
     
     j_taxa=len(counts_mean1)
    
@@ -194,8 +406,8 @@ def get_stylesheet_diff_network(idata1,df_taxa1,idata2,df_taxa2,legend_store,hdi
         'style': {
             'background-color': color,
             'label': 'data(label)',
-            'width': node_size*total_count_mean,
-            'height': node_size*total_count_mean,
+            'width': node_size,
+            'height': node_size,
             'color': 'black',
             'text-valign': 'center',
             'text-halign': 'center',
@@ -219,6 +431,7 @@ def get_stylesheet_diff_network(idata1,df_taxa1,idata2,df_taxa2,legend_store,hdi
                     }
                 }
             else:
+                count_edges+=1
                 if abs(correlation_matrix2[i,j])>=abs(correlation_matrix1[i,j]):
                     #Abs Higher for the second group
                     style_edge={
@@ -248,6 +461,8 @@ def get_stylesheet_diff_network(idata1,df_taxa1,idata2,df_taxa2,legend_store,hdi
     style_elements_legend=get_legend_style(legend_store,'diff-network')
     for el in style_elements_legend:
         stylesheet.append(el)
+
+    print("Count edges diff network: ",count_edges)
     
     return stylesheet
 
@@ -263,7 +478,7 @@ def get_legend_style(legend_store,network_type):
                 'border-color': '#000000',
                 'border-width': 1,
                 'label': 'data(label)',
-                'text-valign': 'top',
+                #'text-valign': 'top',
                 'text-halign': 'center',
                 # 'width': 500000,
                 # 'height': 200,
@@ -455,55 +670,4 @@ def get_dict_element_color(legend_store):
                 dict_elements_group[element]=group["color"]
 
     return dict_elements_group
-
-# def co_occurence_network_cytoscape(idata,df_taxa,hdi,node_size,edge_width,list_positions=None):
-
-#     elements=[]
-
-#     hdi_precision_matrix = az.hdi(idata, var_names=["precision_matrix"], hdi_prob=hdi).precision_matrix
-
-#     precision_matrix=idata.posterior.precision_matrix.mean(dim=["chain", "draw"])
-#     counts_mean=df_taxa.mean(axis=0).tolist()[:-1]
-
-#     #print(counts_mean)
-
-#     taxa_list= df_taxa.columns.tolist()[:-1]
-
-
-#     for i in range(len(taxa_list)):
-#         taxa=taxa_list[i]
-        
-#         elements.append({'data': {'id': str(taxa), 'label': str(taxa)},'position': {'x': 0, 'y': 0}})
-#         #elements.append({'data': {'id': str(i), 'label': str(i)},'position': {'x': 0, 'y': 0}})
-        
-#         #elements.append({'data': {'id': taxa, 'label': taxa, 'size': counts_mean[i]*node_size},'position':{'x': 0, 'y': 0}})
-
-    
-
-#     j_taxa=len(counts_mean)
-#     # Correlation Matrix
-#     correlation_matrix=np.zeros((j_taxa,j_taxa))
-
-#     for i in range (j_taxa):
-#         for j in range (j_taxa):
-#             correlation_matrix[i,j]=precision_matrix[i,j]/(math.sqrt(precision_matrix[i,i]*precision_matrix[j,j]))
-
-#     #print(correlation_matrix)
-
-#     for i in range (len(correlation_matrix)):
-#         for j in range (i):
-#             lower_hdi=hdi_precision_matrix[i][j][0]
-#             higher_hdi=hdi_precision_matrix[i][j][1]
-#             if lower_hdi*higher_hdi>=0: 
-#                 #Same sign, do not contains null value. Create edge
-#                 coefficient = correlation_matrix[i, j]
-#                 color = '#18B532' if coefficient > 0 else '#E22020'
-#                 width = abs(coefficient) * edge_width  #Multiply by a factor to adjust the width of edges
-#                 elements.append({'data': {'source': taxa_list[i], 'target': taxa_list[j], 'width': width*edge_width, 'color': color}})
-#                 #elements.append({'data': {'source': str(i), 'target': str(j), 'width': width*edge_width, 'color': color}})
-#             else: 
-#                 #Different sign, the edge isn't displayed
-#                 pass
-
-#     return elements
 

@@ -4,7 +4,6 @@ from dash.dependencies import Input, Output, State
 import os
 import re
 from dash.exceptions import PreventUpdate
-
 import pty
 import sys
 import json
@@ -65,10 +64,11 @@ def layout_model():
     list_hyperparameters_beta_lasso=["alpha_lambda","beta_lambda","alpha_sigma","beta_sigma"]
     list_latex_expressions_beta_lasso=["\\alpha_{\\lambda}","\\beta_{\\lambda}","\\alpha_{\\sigma}","\\beta_{\\sigma}"]
     list_children_beta_lasso=[]
+    list_values=[0.75,1,2,1]
     for i in range(len(list_hyperparameters_beta_lasso)):
         parameter=list_hyperparameters_beta_lasso[i]
         latex_expression=list_latex_expressions_beta_lasso[i]
-        input_parameter=dcc.Input(id=f'{parameter}_lasso',type='number',placeholder='1',min=0,value=1,step='any',style=input_field_number_style)
+        input_parameter=dcc.Input(id=f'{parameter}_lasso',type='number',placeholder='Value',min=0,value=list_values[i],step='any',style=input_field_number_style)
         parameter=html.Div(children=[dcc.Markdown(f"${latex_expression}$", mathjax=True,style={"text-indent":"30px","display":"inline-block"}),input_parameter])
         list_children_beta_lasso.append(parameter)
     return html.Div([
@@ -88,14 +88,14 @@ def layout_model():
                             dcc.Dropdown(
                                 id='apriori-beta-input',
                                 options=[
+                                    {'label': 'Horseshoe', 'value': 'Horseshoe'},
                                     {'label': 'Ridge', 'value': 'Ridge'},
                                     {'label': 'Lasso', 'value': 'Lasso'},
-                                    {'label': 'Horseshoe', 'value': 'Horseshoe'},
                                     {'label': 'Spike-and-Slab', 'value': 'Spike-and-Slab','disabled': True},
                                 ],
                                 placeholder="Select an option",
                                 multi=False,
-                                value='Ridge',
+                                value='Horseshoe',
                                 persistence=True,
                                 persistence_type=type_storage,
                                 #style={'width': '50%', 'margin': '20px 0','display': 'inline-block'}
@@ -105,23 +105,23 @@ def layout_model():
                         ]),
                         #html.Div(children=[html.H5("Initial Data",style={'fontWeight': 'bold'}),
                         html.Div(children=[
-                            html.H5("Hyperparameters",style={'text-indent':'15px'}),
+                            html.H5("Hyperparameters",style={'text-indent':'15px'},id="div-hyperparameters"),
                             #html.Div(id="hyperparameters-beta"),
                             html.Div(id="hyper-beta-ridge",children=[
                                 html.Div(children=[
                                     dcc.Markdown("$\\alpha$", mathjax=True,style={"text-indent":"30px","display":"inline-block"}),
-                                    dcc.Input(id='alpha_ridge',type='number',placeholder='1',min=0,value=1,step='any',style=input_field_number_style)]),
+                                    dcc.Input(id='alpha_ridge',type='number',placeholder='Value',min=0,value=3,step='any',style=input_field_number_style)]),
                                 html.Div(children=[
                                     dcc.Markdown("$\\beta$", mathjax=True,style={"text-indent":"30px","display":"inline-block"}),
-                                    dcc.Input(id='beta_ridge',type='number',placeholder='1',min=0,value=1,step='any',style=input_field_number_style)])
+                                    dcc.Input(id='beta_ridge',type='number',placeholder='Value',min=0,value=1,step='any',style=input_field_number_style)])
                             ]),
                             html.Div(id="hyper-beta-lasso",children=list_children_beta_lasso),
-                            html.Div(id="hyper-beta-horseshoe",children=[
-                                    dcc.Markdown("$\\beta$", mathjax=True,style={"text-indent":"30px","display":"inline-block"}),
-                                    dcc.Input(id='beta_horseshoe',type='number',placeholder='1',min=0,value=1,step='any',style=input_field_number_style)
-                                    #])
+                            # html.Div(id="hyper-beta-horseshoe",children=[
+                            #         dcc.Markdown("$\\beta$", mathjax=True,style={"text-indent":"30px","display":"inline-block"}),
+                            #         dcc.Input(id='beta_horseshoe',type='number',placeholder='1',min=0,value=1,step='any',style=input_field_number_style)
+                            #         #])
 
-                            ]),
+                            # ]),
                 
                         ]),
                         html.H5("Precision Matrix",style={'fontWeight': 'bold'}),
@@ -176,35 +176,51 @@ def layout_model():
             ]),
             html.Div(style={'width': '70%', 'display': 'inline-block', 'verticalAlign': 'top','borderLeft': '3px solid #ccc'}, children=[
 
-                html.Div(style={'margin-left':'10px','text-indent':'15px'},children=[
-                    html.P('''The MDiNE model is a bayesian hierarchical model.
-                To estimate co-occurrence networks, we need to put some priors  
-                over two parameters, the beta Matrix and the precision matrix.
-                '''),
-                html.P('''The Beta Matrix represents the influence of covariates in the final counts table.
-                Differents priors such as Lasso, Ridge, Spike and Slab, Horseshoe are available through this
-                interface. In a general case the Lasso prior is used. If you want to change the differents 
-                priors you can edit the basic model to adjust the priors to your model.'''),
-                html.P('''The precision Matrix represents the influence of correlation between taxa on the final 
-                counts table. The co-occurence networks are plot from this precision matrix. Differents priors 
-                such as Lasso, Inv-Wishart and Inv-Wishart Penalized are available through this interface. 
-                In general case the Lasso prior is used. If you want to change the differents priors you can edit 
-                the basic model to adjust the priors to your model.'''),
+                html.Div(id="general-text-explanation",style={'margin-left':'10px','text-indent':'15px'},children=[
+                    html.P('''The MDiNE model is a Bayesian Graphical model estimating differential 
+                    co-occurrence network of species. Intuitively, the model allows the estimation 
+                    of precision matrices between two groups. Moreover, standard Bayesian shrinkage 
+                    models are implemented permitting a variable selection procedure between variables 
+                    of interest and species, accounting for the compositionality induced by taxa.''',style={"margin-top":"1em"}),
+                    html.P('''Thus, the model section is separated into 2 sections, the Beta matrix corresponding
+                    to the part related to the covariables and the precision matrix for estimating the 
+                    associations between species across a binary group. However, all models require the 
+                    user to specify certain hyperparameters to ensure that methods give accurate results. 
+                    Briefly, 3 models are available when evaluating the effect of covariables on taxa, 
+                    the LASSO, the Ridge and the Horseshoe.''',style={"margin-top":"1em"}),
+                    html.P('''Below, we are providing guidance about the choice of values of hyperparameters 
+                    depending on the type of model chosen by the user.''',style={"margin-top":"1em"})
+                ]),
 
-                html.H2("Aprioris for Beta Matrix"),
+                html.H5("Informations about Beta Matrix model",style={'fontWeight': 'bold',"margin-top":"2em",'margin-left':'10px'}),
 
-                html.H4("Ridge",style={'fontWeight': 'bold'}),
-
-                dcc.Markdown(r'''$$
+                html.Div(id='info-beta-horseshoe',style={'margin-left':'10px','text-indent':'15px'},children=[
+                    html.P('''For the horseshoe, no value must be explicitly specified by the user. We recommend using this prior 
+                           as a default choice, since the horseshoe applies a local- global- shrinkage.''',style={"margin-top":"1em"}),
+                           dcc.Markdown('''This is the Bayesian hierarchical writing of the Horseshoe apriori:'''),
+                           dcc.Markdown(r'''$$
                              \begin{aligned}
-                             \lambda &\sim Gamma(\alpha,\beta) \\
-                                \beta_{j} &\sim \mathcal{N}(0,\frac{1}{\lambda})
-                             \end{aligned}$$''', mathjax=True),
+                             \tau &\sim HalfCauchy(1) \\
+                            \lambda_{j} &\sim HalfCauchy(\tau) \\
+                            \beta_{j} &\sim \mathcal{N}(0,\lambda_{j}^2) 
+                             \end{aligned}
+                             $$''', mathjax=True),
+                ]),
 
-                
-                html.H4("Lasso",style={'fontWeight': 'bold'}),
-
-                dcc.Markdown(r'''$$
+                html.Div(id='info-beta-lasso',style={'margin-left':'10px','text-indent':'15px'},children=[
+                dcc.Markdown('''For the Bayesian LASSO, the parameter $\\tau$ controls the amount of shrinkage 
+                            required for obtaining a sparse model. The higher $\\tau$, the lower the coefficients 
+                            will be penalized, and conversely for small values of $\\tau$. However, $\\tau$ is also 
+                            dependent on $\\lambda$ fully characterized by $\\alpha_\\lambda$ and $\\beta_\\lambda$, the 
+                            two hyperparameters requiring tuning. We recommend to start with values for 
+                            $\\alpha_\\lambda$ between 0.5 and 1, keeping $\\beta_\\lambda$ constant at 1. If user wants to 
+                            have more aggressive shrinkage, lower values for $\\alpha_\\lambda$ should be considered. 
+                            For $\\alpha_\\sigma$ and $\\beta_\\sigma$, initial values of 2 and 1, respectively are recommended 
+                            as default choices. This prior could be considered if the user aims to moderately 
+                            shrink coefficients towards zero.
+                            ''', style={"margin-top": "1em"},mathjax=True),
+                            dcc.Markdown('''This is the Bayesian hierarchical writing of the LASSO apriori:'''),
+                            dcc.Markdown(r'''$$
                              \begin{aligned}
                                 \lambda^{2} &\sim Gamma(\alpha_{\lambda},\beta_{\lambda}) \\
                                 \sigma^{2}  &\sim InvGamma(\alpha_{\sigma},\beta_{\sigma}) \\
@@ -213,32 +229,50 @@ def layout_model():
                                 \end{aligned}
                              $$''', mathjax=True),
 
-                html.H4("Horseshoe",style={'fontWeight': 'bold'}),
+                        ]),
 
-                dcc.Markdown(r'''$$
+
+                html.Div(id='info-beta-ridge',style={'margin-left':'10px','text-indent':'15px'},children=[
+                    dcc.Markdown('''For the Bayesian Ridge, the amount of shrinkage is controlled by $\\lambda$, 
+                           the precision parameter of beta.  To ensure proper shrinkage on coefficients, 
+                           we recommend using $\\alpha$ moderately larges between 2 and 5, fixing $\\beta$ to 1. 
+                           This ensures a moderate shrinkage with beta concentrated to zero with variance 
+                           equal to $\\frac{1}{\\alpha}$. We do not recommend using larger values, except if a stronger
+                           prior is assumed on the effect between covariables and taxa.
+                           This prior could be considered if the user aims to proceed to soft shrinkage.''',
+                           style={"margin-top":"1em"},mathjax=True),
+                    dcc.Markdown('''This is the Bayesian hierarchical writing of the Ridge apriori:'''),
+                    dcc.Markdown(r'''$$
                              \begin{aligned}
-                             \tau &\sim HalfCauchy(\beta) \\
-                            \lambda_{j} &\sim HalfCauchy(\tau) \\
-                            \beta_{j} &\sim \mathcal{N}(0,\lambda_{j}) 
-                             \end{aligned}
-                             $$''', mathjax=True),
-
-                html.H4("Spike and Slab",style={'fontWeight': 'bold'}),
-
-                dcc.Markdown(r'''$$
-                             \begin{aligned}
-                            \pi_{j} &\sim Beta(\alpha,\beta) \\
-                            \gamma_{j} &\sim Bernouilli (\pi_{j}) \\
-                            \beta_{j} &\sim (1-\gamma_{j})\mathcal{N}(0,\tau)+\mathcal{N}(0,\tau c)
-                            \end{aligned}
-                             $$''', mathjax=True),
-
+                             \lambda &\sim Gamma(\alpha,\beta) \\
+                                \beta_{j} &\sim \mathcal{N}(0,\frac{1}{\lambda})
+                             \end{aligned}$$''', mathjax=True),
                 ]),
-                #html.H3('Partie Droite'),
                 
 
-                
-                
+                html.H5("Informations about Precision Matrix model",style={'fontWeight': 'bold',"margin-top":"2em",'margin-left':'10px'}),
+
+                html.Div(id="info-precision-lasso",style={'margin-left':'10px','text-indent':'15px'},children=[
+                    html.P('''For the Graphical LASSO, shrinkage in precision matrices across the two groups 
+                    is controlled by the parameter lambda. Intuitively, the higher lambda is, the closer 
+                    off-diagonal elements (covariances) are to zero. However, values of lambda excessively 
+                    large could lead to convergence issues, making the resulting precision matrices unrealistic.''',style={"margin-top":"1em"}), 
+                    html.P('''Thus, we recommend starting with values between 1 and 3, suggesting low to moderate penalizations. 
+                    For small problems, with a few taxa than the number of individuals, empirical Bayes procedures could 
+                    be exploited. We provided a complete tutorial on how to estimate lambda from the data, here: .''',style={"margin-top":"1em"})
+                ])
+
+                # html.H4("Spike and Slab",style={'fontWeight': 'bold'}),
+
+                # dcc.Markdown(r'''$$
+                #              \begin{aligned}
+                #             \pi_{j} &\sim Beta(\alpha,\beta) \\
+                #             \gamma_{j} &\sim Bernouilli (\pi_{j}) \\
+                #             \beta_{j} &\sim (1-\gamma_{j})\mathcal{N}(0,\tau)+\mathcal{N}(0,\tau c)
+                #             \end{aligned}
+                #              $$''', mathjax=True),
+
+                # ]),
                 
             ])
         ])
@@ -246,14 +280,12 @@ def layout_model():
 @app.callback(Output("info-current-file-store","data",allow_duplicate=True),
               Output("hyper-beta-ridge","style",allow_duplicate=True),
               Output("hyper-beta-lasso","style",allow_duplicate=True),
-              Output("hyper-beta-horseshoe","style",allow_duplicate=True),
+              Output("div-hyperparameters","style",allow_duplicate=True),
               Output("hyper-precision-lasso","style",allow_duplicate=True),
               Output("hyper-precision-inv-wishart","style",allow_duplicate=True),
               Output("hyper-precision-inv-wishart-penalized","style",allow_duplicate=True),
               Output("apriori-beta-input","value"),
               Output("apriori-precision-matrix-input","value"),
-              Output("alpha_ridge","value"),
-              Output("beta_ridge","value"),
               Output("lambda_init_lasso","value"),
               Input("reset-values-button","n_clicks"),
               State("info-current-file-store","data"),prevent_initial_call=True)
@@ -261,16 +293,10 @@ def reset_values(n_clicks,info_current_file_store):
     if n_clicks==None:
         raise PreventUpdate
     style_none={"display":"none"}
-    alpha_ridge=1
-    beta_ridge=1
     lambda_init=1
     info_current_file_store["parameters_model"]={
         'beta_matrix':{
-            'apriori':'Ridge',
-            'parameters':{
-                'alpha':alpha_ridge,
-                'beta':beta_ridge
-            }
+            'apriori':'Horseshoe',
         },
         'precision_matrix':{
             'apriori':'Lasso',
@@ -279,16 +305,20 @@ def reset_values(n_clicks,info_current_file_store):
             }
         }
     }
-    return info_current_file_store,None,style_none,style_none,None,style_none,style_none,"Ridge","Lasso",alpha_ridge,beta_ridge,lambda_init
+    return info_current_file_store,style_none,style_none,style_none,None,style_none,style_none,"Horseshoe","Lasso",lambda_init
 
 
 @app.callback(Output("info-current-file-store","data",allow_duplicate=True),
               Output("hyper-beta-ridge","style",allow_duplicate=True),
               Output("hyper-beta-lasso","style",allow_duplicate=True),
-              Output("hyper-beta-horseshoe","style",allow_duplicate=True),
+              #Output("hyper-beta-horseshoe","style",allow_duplicate=True),
               Output("hyper-precision-lasso","style",allow_duplicate=True),
               Output("hyper-precision-inv-wishart","style",allow_duplicate=True),
               Output("hyper-precision-inv-wishart-penalized","style",allow_duplicate=True),
+              Output("div-hyperparameters","style"),
+              Output("info-beta-horseshoe","style"),
+              Output("info-beta-lasso","style"),
+              Output("info-beta-ridge","style"),
               Input('apriori-beta-status', 'data'),
               Input('apriori-precision-matrix-status', 'data'),
               Input("alpha_ridge","value"),
@@ -297,18 +327,23 @@ def reset_values(n_clicks,info_current_file_store):
               Input("beta_lambda_lasso","value"),
               Input("alpha_sigma_lasso","value"),
               Input("beta_sigma_lasso","value"),
-              Input("beta_horseshoe","value"),
+              #Input("beta_horseshoe","value"),
               Input("lambda_init_lasso","value"),
               State("info-current-file-store","data"),prevent_initial_call=True)
-def change_parameters_model(choice_beta,choice_precision,alpha_ridge,beta_ridge,alpha_l_lasso,beta_l_lasso,alpha_s_lasso,beta_s_lasso,beta_horseshoe,lambda_init,info_current_file_store):
+def change_parameters_model(choice_beta,choice_precision,alpha_ridge,beta_ridge,alpha_l_lasso,beta_l_lasso,alpha_s_lasso,beta_s_lasso,lambda_init,info_current_file_store): #beta_horseshoe
     style_none={"display":"none"}
+
+    style_info_prior={'margin-left':'10px','text-indent':'15px'}
+    style_info_horseshoe=None
+    style_info_lasso=None
+    style_info_ridge=None
 
     style_beta_ridge=None
     style_beta_lasso=None
-    style_beta_horseshoe=None
     style_prec_lasso=None
     style_prec_inv_wishart=None
     style_prec_inv_wishart_penalized=None
+    style_div_hyperparameters={'text-indent':'15px'}
 
     ##Beta Matrix
     if choice_beta["value"]=="Ridge":
@@ -320,7 +355,10 @@ def change_parameters_model(choice_beta,choice_precision,alpha_ridge,beta_ridge,
             }
         }
         style_beta_lasso=style_none
-        style_beta_horseshoe=style_none
+        style_info_horseshoe=style_none
+        style_info_lasso=style_none
+        style_info_ridge=style_info_prior
+
     elif choice_beta["value"]=="Lasso":
         info_current_file_store["parameters_model"]["beta_matrix"]={
             'apriori':"Lasso",
@@ -332,16 +370,21 @@ def change_parameters_model(choice_beta,choice_precision,alpha_ridge,beta_ridge,
             }
         }
         style_beta_ridge=style_none
-        style_beta_horseshoe=style_none
+        style_info_horseshoe=style_none
+        style_info_lasso=style_info_prior
+        style_info_ridge=style_none
+        
     elif choice_beta["value"]=="Horseshoe":
         info_current_file_store["parameters_model"]["beta_matrix"]={
             'apriori':"Horseshoe",
-            'parameters':{
-                'beta_tau':beta_horseshoe,
-            }
         }
         style_beta_ridge=style_none
         style_beta_lasso=style_none
+        style_div_hyperparameters=style_none
+
+        style_info_horseshoe=style_info_prior
+        style_info_lasso=style_none
+        style_info_ridge=style_none
 
     ##Precision Matrix 
     if choice_precision["value"]=="Lasso":
@@ -366,7 +409,7 @@ def change_parameters_model(choice_beta,choice_precision,alpha_ridge,beta_ridge,
         style_prec_lasso=style_none
         style_prec_inv_wishart=style_none
 
-    return info_current_file_store,style_beta_ridge,style_beta_lasso,style_beta_horseshoe,style_prec_lasso,style_prec_inv_wishart,style_prec_inv_wishart_penalized
+    return info_current_file_store,style_beta_ridge,style_beta_lasso,style_prec_lasso,style_prec_inv_wishart,style_prec_inv_wishart_penalized,style_div_hyperparameters,style_info_horseshoe,style_info_lasso,style_info_ridge
 
 
 # add a click to the appropriate store.
@@ -420,13 +463,15 @@ def on_click(n_clicks,data):
               Output("run-model-button",'disabled'),
               Output("run-model-button","title"),
               Output("cancel-model-button",'disabled'),
+              Output('status-run-model','data'),
             Input('run-model-status', 'modified_timestamp'),
             Input('interval-component', 'n_intervals'),
             State('run-model-status','data'),
             State('info-current-file-store','data'),
             State("run-model-output", 'children'),
+            State('status-run-model','data'),
             prevent_initial_call=True)
-def on_data(ts,n_intervals,data,info_current_file_store,model_output_children):
+def on_data(ts,n_intervals,data,info_current_file_store,model_output_children,status_run_model):
 
     if ts is None:
         raise PreventUpdate
@@ -435,10 +480,10 @@ def on_data(ts,n_intervals,data,info_current_file_store,model_output_children):
 
     if data.get('run_model',False)==False:
         if info_current_file_store["reference_taxa"]!=None and info_current_file_store["covar_end"]!=None and info_current_file_store['phenotype_column']!='error':
-            return info_current_file_store,model_output_children,False,None,True
+            return info_current_file_store,model_output_children,False,None,True,'not-yet'
         else:
             title="At least one error in the data section, please check the errors."
-            return info_current_file_store,model_output_children,True,title,True
+            return info_current_file_store,model_output_children,True,title,True,'not-yet'
     
     ctx = dash.callback_context
 
@@ -449,7 +494,7 @@ def on_data(ts,n_intervals,data,info_current_file_store,model_output_children):
 
     #print("Trigger: ",trigger)
 
-    if trigger == 'run-model-status' and info_current_file_store["status-run-model"]=="not-yet":
+    if trigger == 'run-model-status' and status_run_model=="not-yet":
         # 'Run Model button was clicked'
         #print("Avant le thread")
         title="You cannot run the model twice. If you want to run another simulation, open a new window. "
@@ -460,55 +505,60 @@ def on_data(ts,n_intervals,data,info_current_file_store,model_output_children):
 
         
         process = subprocess.Popen(cmd, stdin=slave_fd, stdout=slave_fd, stderr=slave_fd,text=True, close_fds=True)
+
+        if os.path.exists(os.path.join(info_current_file_store["session_folder"],"output_model.json")):
+            os.remove(os.path.join(info_current_file_store["session_folder"],"output_model.json"))
         
 
-        print("File path: ",os.path.join(info_current_file_store["session_folder"],"output_model.json"))
+        #print("File path: ",os.path.join(info_current_file_store["session_folder"],"output_model.json"))
         os.close(slave_fd)
         threading.Thread(target=write_output_to_file, args=(master_fd,os.path.join(info_current_file_store["session_folder"],"output_model.json"))).start()
-        info_current_file_store["status-run-model"]="in-progress"
+        #info_current_file_store["status-run-model"]="in-progress"
         info_current_file_store["process_pid"]=process.pid
-
-        if info_current_file_store["phenotype_column"]==None:
-            #Only one group
-            children=[html.H5("Inference started"),
-                      html.H5("Sampling -- chains, -- divergences"),
-                      html.Progress(id="progress-bar",className="progress-bar", value="0", max="100"),
-                      html.H5("Remaining time: --:--:--")]
-        elif info_current_file_store["phenotype_column"]!="error":
-            children=[html.H5("First inference started"),
-                      html.H5("Sampling -- chains, -- divergences"),
-                      html.Progress(id="first-progress-bar",className="progress-bar", value="0", max="100"),
-                      html.H5("Remaining time: --:--:--")]
           
         
-        return info_current_file_store,children,True,title,False
+        return info_current_file_store,None,True,title,False,"in-progress"
     elif trigger == 'interval-component':
         title="You cannot run the model twice. If you want to run another simulation, open a new window. "
         #'Interval component was triggered'
     
         json_path=os.path.join(info_current_file_store["session_folder"],"output_model.json")
-        data = read_json_file(json_path)
+        all_output= read_json_file(json_path)
 
-        if "text" in data:
-            children=[html.H5(data["text"])]
-        elif "chains" in data:
-            percentage = data.get('percentage', '0')
-            chains = data.get('chains', '--')
-            divergences = data.get('divergences', '--')
-            time_remaining = data.get('time', '--:--:--')
-            sampling_info=f"Sampling {chains} chains, {divergences} divergences"
+        children=[]
 
-            percentage_str=f"{percentage} %"
-
-            remaining_time=f"Remaining time: {time_remaining}"
-
-            children=[html.H5(sampling_info),
-            html.Div([html.Progress(id="progress-bar",className="progress-bar", value=str(percentage), max="100"),html.H5(percentage_str,style={'display':'inline-block','padding-left':"2%"})]),
-            html.H5(remaining_time)]
+        if len(all_output)!=0 and "model.debug()" in all_output[-1].get("text","Error"):
+            children.append(html.H5("The model initialization did not work. Please check that you have at least three taxas remaining and consider revising the hyperparameterisation, in particular the choice of lambda_init for the precision matrix."))
         else:
-            print("Data null je pense: ")
-            print(data)
-            children=html.H5("I have found nothing")
+            for data in all_output:
+
+                if data!=None:
+
+                    if "text" in data:
+                        children.append(html.H5(data["text"]))
+                    elif "chains" in data:
+                        percentage = data.get('percentage', '0')
+                        chains = data.get('chains', '--')
+                        divergences = data.get('divergences', '--')
+                        time_remaining = data.get('time', '--:--:--')
+                        sampling_info=f"Sampling {chains} chains, {divergences} divergences"
+
+                        percentage_str=f"{percentage} %"
+
+                        remaining_time=f"Remaining time: {time_remaining}"
+
+                        return_div=html.Div(children=[
+                            html.H5(sampling_info),
+                        html.Div([html.Progress(id="progress-bar",className="progress-bar", value=str(percentage), max="100"),html.H5(percentage_str,style={'display':'inline-block','padding-left':"2%"})]),
+                        html.H5(remaining_time)
+
+                        ])
+
+                        children.append(return_div)
+                    else:
+                        #print("Data null je pense: ")
+                        print(data)
+                        #children=html.H5("I have found nothing")
 
         # if info_current_file_store["phenotype_column"]==None:
         #     #Only one group
@@ -526,15 +576,16 @@ def on_data(ts,n_intervals,data,info_current_file_store,model_output_children):
         
         if check_run_finish(info_current_file_store):
             #print("Le thread est terminé.")
-            info_current_file_store["status-run-model"] = "completed"
+            #info_current_file_store["status-run-model"] = "completed"
+            status_run_model="completed"
             disabled_cancel_button=True
             
         # else:
         #     print("Le thread est toujours en cours d'exécution...")
 
-        return info_current_file_store,children,True,title,disabled_cancel_button
+        return info_current_file_store,children,True,title,disabled_cancel_button,status_run_model
     else:
-        return info_current_file_store,model_output_children,True,None,True
+        return info_current_file_store,model_output_children,True,None,True,status_run_model
     
 def read_json_file(file_path):
     try:
@@ -552,13 +603,38 @@ def read_json_file(file_path):
 def write_output_to_file(fd,json_filename):
             with os.fdopen(fd, 'r') as output:
                 for line in output:
-                    data=extract_info(line)
-                    try:
-                        with open(json_filename, 'w') as file:
-                            json.dump(data, file, indent=4)
-                    except:
-                        #The file has been deleted by the other thread
-                        pass
+                    print(line)
+                    new_data=extract_info(line)
+                    # try:
+                    #     with open(json_filename, 'a') as file:
+                    #         json.dump(data, file, indent=4)
+                    # except:
+                    #     #The file has been deleted by the other thread
+                    #     pass
+                    # Si le fichier existe, lire les données
+                    if os.path.exists(json_filename):
+                        with open(json_filename, 'r') as f:
+                            data = json.load(f)
+                    else:
+                        data = []
+
+
+                    # Vérifier si le dernier élément est "progression_bar"
+                    if data and data[-1]!=None and "chains" in data[-1]:
+                        if "chains" in new_data:
+                            # Remplacer le dernier élément
+                            data[-1] = new_data
+                        else:
+                            # Ajouter à la suite
+                            data.append(new_data)
+                    else:
+                        # Ajouter à la suite
+                        data.append(new_data)
+
+                    # Écrire les données mises à jour dans le fichier
+                    with open(json_filename, 'w') as f:
+                        json.dump(data, f, indent=4)
+
 
 def extract_info(output):
     match = re.search(
@@ -574,15 +650,26 @@ def extract_info(output):
             "time": match.group(4)
         }
     else:
-        return {
-            "text":output
-        }
+        if "NUTS:" in output:
+            return {
+                "text":"Inference started"
+            }
+        elif "\x1b[2KSampling" in output:
+            return {"text":""}
+        elif "\u001b[?25l\n" in output:
+            return {"text":""}
+        elif "\u001b[?25h" in output:
+            return {"text":output.replace("\u001b[?25h","")}
+        else:
+            return {
+                "text":output
+            }
 
 def check_run_finish(info_current_file_store):
     if info_current_file_store["second_group"]!=None:
-        file_path=os.path.join(info_current_file_store["session_folder"],"second_group","idata.pkl")
+        file_path=os.path.join(info_current_file_store["session_folder"],"second_group","idata.nc")
     else:
-        file_path=os.path.join(info_current_file_store["session_folder"],"idata.pkl")
+        file_path=os.path.join(info_current_file_store["session_folder"],"idata.nc")
     return os.path.exists(file_path)
     
     

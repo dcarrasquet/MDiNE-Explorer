@@ -86,10 +86,8 @@ footer_style={
     'padding': '20px 0',
 }
 
-completed=False
 
-if completed==False:
-    initial_info_current_file={
+initial_info_current_file={
     "monitor_thread_launched_pid":False,
     "monitor_thread_launched_folder":False,
     "process_pid": None,
@@ -107,57 +105,20 @@ if completed==False:
     'second_group':None,
     'filter_zeros':None,
     'filter_dev_mean':None,
-    'status-run-model':'not-yet',
+    #'status-run-model':'not-yet',
     'parameters_model':{
         'beta_matrix':{
-            'apriori':'Normal',
-            'parameters':{
-                'alpha':1,
-                'beta':1
-            }
+            'apriori':'Horseshoe',
         },
         'precision_matrix':{
             'apriori':'Lasso',
             'parameters':{
-                'lambda_init':0.08
+                'lambda_init':999
             }
         }
     }
 }
-else:
-    initial_info_current_file={
-        "monitor_thread_launched":False,
-        'filename':"data/dash_app/session_0/crohns-numeric-tsv.tsv",
-        'session_folder':"data/dash_app/session_0/",
-        'nb_rows':100,
-        'nb_columns':11,
-        'covar_start':2,
-        'covar_end':5,
-        'taxa_start':6,
-        'taxa_end':11,
-        'reference_taxa':'otu.counts.ref',
-        'phenotype_column':2,
-        'first_group':34,
-        'second_group':66,
-        'filter_zeros':None,
-        'filter_dev_mean':None,
-        'status-run-model':'not-yet',
-        'parameters_model':{
-            'beta_matrix':{
-                'apriori':'Normal',
-                'parameters':{
-                    'alpha':1,
-                    'beta':1
-                }
-            },
-            'precision_matrix':{
-                'apriori':'Lasso',
-                'parameters':{
-                    'lambda_init':0.08
-                }
-            }
-        }
-    }
+
 
 def make_layout():
     path_data="data/dash_app"
@@ -169,15 +130,25 @@ def make_layout():
         except OSError as e:
             print(f"Erreur : Impossible de créer le dossier '{path_data}' : {e.strerror}")
 
+    values_sliders={
+        "credibility":0.95,
+        "edges_width":5,
+        "nodes_size":70,
+        "font_size":20,
+    }
+
     return html.Div(children=[
         dcc.Interval(id='check-deconnection',interval=5*1000,n_intervals=0),
-        dcc.Location(id='location'),
+        dcc.Store(id='status-sliders-co-occurence', storage_type=type_storage,data=values_sliders),
+        dcc.Store(id='status-sliders-features-selection', storage_type=type_storage,data=values_sliders),
+        dcc.Store(id='status-legend-covariates', storage_type=type_storage,data={"color":"#2acedd","text":"Covariates"}),
         html.Div(id="useless-component"),
         html.Div(style={"padding-bottom": "10vh"},children=[
         # Barre de navigation
         html.Nav(style=nav_style, className="navbar", children=[
             html.Div(className="navbar-brand"),
             dcc.Store(id='info-current-file-store', storage_type=type_storage,data=initial_info_current_file),
+            dcc.Store(id='status-run-model', storage_type=type_storage,data="not-yet"),
             dcc.Store(id='actual-tab-store', storage_type=type_storage,data="tab-home"),
             html.Div(className="navbar-menu", style={'justifyContent': 'center', 'width': '100%'}, children=[
                 dcc.Tabs(id="tabs-mdine", value='tab-home', style={'width': '100%'},persistence=True,persistence_type=type_storage, children=[
@@ -224,9 +195,9 @@ def change_store_tab(tab):
               #Input('tabs-mdine', 'value'),
               Input("actual-tab-store",'modified_timestamp'),
               State("actual-tab-store",'data'),
-
-              State("info-current-file-store","data"),prevent_initial_call=True)
-def render_content(ts,tab,info_current_file_store):
+              State("info-current-file-store","data"),
+              State("status-run-model","data"),prevent_initial_call=True)
+def render_content(ts,tab,info_current_file_store,status_run_model):
     if ts is None:
         raise PreventUpdate
     display_none={'display':'none'}
@@ -235,7 +206,7 @@ def render_content(ts,tab,info_current_file_store):
     elif tab == 'tab-data':
         return display_none,None,display_none,display_none,None,None,None
     elif tab == 'tab-model':
-        if info_current_file_store["reference_taxa"]!=None and info_current_file_store["covar_end"]!=None and info_current_file_store["status-run-model"]=='not-yet' and info_current_file_store['phenotype_column']!='error':
+        if info_current_file_store["reference_taxa"]!=None and info_current_file_store["covar_end"]!=None and status_run_model=='not-yet' and info_current_file_store['phenotype_column']!='error':
             return display_none,display_none,None,display_none,None,False,None
         else:
             #At leat one error in the data section
@@ -244,7 +215,7 @@ def render_content(ts,tab,info_current_file_store):
     elif tab == 'tab-visualization':
         return display_none,display_none,display_none,None,None,None,None
     elif tab == 'tab-export':
-        return display_none,display_none,display_none,display_none,layout_export_results(info_current_file_store),None,None
+        return display_none,display_none,display_none,display_none,layout_export_results(status_run_model),None,None
     
 
 
@@ -347,5 +318,4 @@ def close_session():
 
 if __name__=="__main__":
     app.layout=make_layout()
-    #app.run(host='0.0.0.0',port=8080,debug=True)
     app.run(host='0.0.0.0',port=8080,debug=True)
