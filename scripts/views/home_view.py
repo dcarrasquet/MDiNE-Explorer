@@ -7,8 +7,8 @@ from maindash import app
 def layout_home():
     layout=html.Div(children=[
 
-    html.P('''iMDiNE is a user-friendly interface for analyzing differential networks of
-           species. iMDiNE exploits the original MDiNE framework to have robust inferences 
+    html.P('''MDiNE Explorer is a user-friendly interface for analyzing differential networks of
+           species. MDiNE Explorer exploits the original MDiNE framework to have robust inferences 
            on the associations between taxa. Moreover, the tool allows the user to identify 
            core variables associated with species, exploiting powerful Bayesian feature 
            selection strategies, such as the Horseshoe, LASSO or Ridge. The model is 
@@ -21,7 +21,7 @@ def layout_home():
     html.H5("Data Step",style={'fontWeight': 'bold',"margin-top":"2em",'margin-left':'10px'}),
 
     html.Div(id='data-step',style={'margin-left':'10px','text-indent':'15px'},children=[
-        html.P('''iMDiNE requires a .tsv text file including both taxa and covariables. 
+        html.P('''MDiNE Explorer requires a .tsv text file including both taxa and covariables. 
                Column names must be included. The user could specify the reference taxa 
                and whether the model must be fitted in both two groups. If this option is
                 not chosen by the user, one network will be constructed combining all the 
