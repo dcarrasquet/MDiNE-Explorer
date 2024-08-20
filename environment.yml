@@ -12,3 +12,4 @@ dependencies:
       - pandas==2.2.1 
       - arviz==0.18.0
       - numpy==1.26.4
+      - networkx==3.3
