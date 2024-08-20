@@ -10,6 +10,7 @@ from pytensor.tensor.linalg import inv as matrix_inverse
 import json
 import os
 import arviz as az
+import re
 
 import sys
     
@@ -22,7 +23,6 @@ except ImportError:
 
 def run_model(covariate_matrix_data,counts_matrix_data,simulation,folder):
 
-    # print("Covariates ",covariate_matrix_data)
     # print("Txaa: ",counts_matrix_data)
     # print("Simulation: ",simulation)
 
@@ -77,7 +77,7 @@ def run_model(covariate_matrix_data,counts_matrix_data,simulation,folder):
 
             beta_matrix=pm.Normal("beta_matrix",mu=0,sigma=lambda_horseshoe*tau)
         
-        elif beta_matrix_choice=="Spike_and_slab":
+        elif beta_matrix_choice=="Spike-and-Slab":
             #proba_gamma=0.5 # Eventually pm.beta
             alpha_gamma=parameters_beta_matrix["alpha_gamma"]
             beta_gamma=parameters_beta_matrix["beta_gamma"]
@@ -91,22 +91,61 @@ def run_model(covariate_matrix_data,counts_matrix_data,simulation,folder):
             # Hadamard product between two tensors: A*B
             beta_matrix=pm.Deterministic("beta_matrix",(pymc.math.ones((k_covariates, j_taxa))-gamma_matrix)*pm.Normal("Beta_Spike",mu=0, sigma=tau, shape=(k_covariates, j_taxa))+gamma_matrix*pm.Normal("Beta_Slab",mu=0, sigma=tau*c, shape=(k_covariates, j_taxa)))
 
+        elif beta_matrix_choice=="LN-CASS":
+            #Logit Normal continuous analogue of spike and slab
+            mu_hat = 0    
+            sigma_hat = 10    
+            tau = 5    
+            lambda_hat = pm.Normal('lambda_hat', mu = mu_hat, sigma = sigma_hat, shape = (k_covariates,j_taxa))     
+            spike_raw = pm.Normal('spike_raw', mu = 0, sigma = 1, shape = (k_covariates,j_taxa))     
+            beta_matrix = pm.Deterministic('beta_matrix',tau*spike_raw*pm.invlogit(lambda_hat))     
+           
+
         else:
-            raise ValueError(f"Invalid precision_matrix_choice: {precision_matrix_choice}")
+            raise ValueError(f"Invalid beta_matrix_choice: {precision_matrix_choice}")
 
         ## Precision Matrix
 
         if precision_matrix_choice=="Lasso":
 
             lambda_init=parameters_precision_matrix["lambda_init"]
+            print('Lambda init: ',lambda_init)
             lambda_mdine=pm.Exponential("lambda_mdine",1/lambda_init) 
+
+            
+
+            L_diag = pm.Exponential("L_diag", lam=lambda_mdine / 2, shape=(j_taxa,))  # Diagonal elements
+            L_off_diag = pm.Laplace("L_off_diag", mu=0, b=1/lambda_mdine, shape=(j_taxa*(j_taxa-1)/2,))
+            L_unpacked = pymc.math.expand_packed_triangular(n=j_taxa-1, packed=L_off_diag)
+
+
+            premiere_etape=pymc.math.concatenate([L_unpacked,pt.zeros(shape=(j_taxa-1,1))],axis=1)
+            L_unpacked_good=pymc.math.concatenate([pt.zeros(shape=(1,j_taxa)),premiere_etape],axis=0)
+
+            L = pm.Deterministic("L", L_unpacked_good +  pytensor.tensor.diag(L_diag))
+            regularization_term = 1e-6
+            precision_matrix = pm.Deterministic("precision_matrix", pm.math.dot(L, L.T)+regularization_term * np.eye(j_taxa))
+
+            
+
+            # matrix_np=precision_matrix.eval()
+            # print("Valuers propres: ",np.linalg.eigvals(matrix_np))
+
+            # #print(is_symmetric_positive_definite(matrix_np))
+
+            # det = np.linalg.det(matrix_np)
+
+            # if det != 0:
+            #     print("La matrice est inversible.")
+            # else:
+            #     print("La matrice n'est pas inversible.")
 
             #Construction of the diagonal and off-diagonal coefficients.
 
-            precision_matrix_coef_diag=pm.Exponential("precision_matrix_coef_diag",lam=lambda_mdine/2,shape=(j_taxa,))
-            precision_matrix_coef_off_diag=pm.Laplace("precision_matrix_coef_off_diag",mu=0,b=1/lambda_mdine,shape=(j_taxa*(j_taxa-1)/2,))
+            #precision_matrix_coef_diag=pm.Exponential("precision_matrix_coef_diag",lam=lambda_mdine/2,shape=(j_taxa,))
+            #precision_matrix_coef_off_diag=pm.Laplace("precision_matrix_coef_off_diag",mu=0,b=1/lambda_mdine,shape=(j_taxa*(j_taxa-1)/2,))
 
-            precision_matrix=pm.Deterministic("precision_matrix",make_precision_matrix(precision_matrix_coef_diag,precision_matrix_coef_off_diag,j_taxa))
+            #precision_matrix=pm.Deterministic("precision_matrix",make_precision_matrix(precision_matrix_coef_diag,precision_matrix_coef_off_diag,j_taxa))
 
         elif precision_matrix_choice=="Invwishart":
             scale_matrix=np.eye(j_taxa)
@@ -184,7 +223,10 @@ def run_model(covariate_matrix_data,counts_matrix_data,simulation,folder):
 
     with mdine_model:
         #mdine_model.debug()
-        idata = pm.sample(1000,init='auto') ## 10000 normally
+        #idata = pm.sample(1000,init='auto') ## 10000 normally
+
+        #idata = pm.sample(1000,init="adapt_diag") ## 10000 raws tune 2000
+        idata = pm.sample(draws=simulation["nb_draws"],tune=simulation["nb_tune"],nuts_sampler_kwargs={"target_accept":simulation["target_accept"]})
 
     if idata!=None:
         az.to_netcdf(idata, os.path.join(folder,"idata.nc"))
@@ -197,7 +239,38 @@ def make_precision_matrix(coef_diag,coef_off_diag,j_taxa):
     premiere_etape=pymc.math.concatenate([triang_laplace,pt.zeros(shape=(j_taxa-1,1))],axis=1)
     triang_strict=pymc.math.concatenate([pt.zeros(shape=(1,j_taxa)),premiere_etape],axis=0)
 
-    return triang_strict+pytensor.tensor.transpose(triang_strict)+pytensor.tensor.diag(coef_diag)
+    result=triang_strict + pytensor.tensor.transpose(triang_strict) + pytensor.tensor.diag(coef_diag)
+
+    matrix_np=result.eval()
+    print("Valuers propres: ",np.linalg.eigvals(matrix_np))
+
+    print(is_symmetric_positive_definite(matrix_np))
+
+    det = np.linalg.det(matrix_np)
+
+    if det != 0:
+        print("La matrice est inversible.")
+    else:
+        print("La matrice n'est pas inversible.")
+
+    #print("AAAAA; ",result.eval())
+    #np.linalg.eigvals()
+
+    return result
+
+def is_symmetric_positive_definite(A):
+    # Vérifier si la matrice est symétrique
+    if not np.allclose(A, A.T):
+        return False, "La matrice n'est pas symétrique."
+
+    # Calcul des valeurs propres
+    eigenvalues = np.linalg.eigvals(A)
+
+    # Vérifier si toutes les valeurs propres sont strictement positives
+    if np.all(eigenvalues > 0):
+        return True, "La matrice est symétrique définie positive."
+    else:
+        return False, "La matrice n'est pas définie positive."
 
 def estimate_lambda_init(covariate_matrix_data,counts_matrix_data):
 
@@ -290,6 +363,99 @@ def run_model_terminal():
 
         print("Start second inference")
         run_model(df_covariates_2,df_taxa_2,info_current_file_store["parameters_model"],path_second_group)
+
+def test_model(lambda_init):
+
+    folder_parent = 'data/test_mdine_loic'
+
+    sub_folders = []
+
+    for element in os.listdir(folder_parent):
+        complete_path = os.path.join(folder_parent, element)
+        if os.path.isdir(complete_path):
+            sub_folders.append(element)
+
+    numbers_simulations = [int(re.search(r'\d+', nom).group()) for nom in sub_folders if re.search(r'\d+', nom)]
+    #simulation_number = max(numbers_simulations)+1 if numbers_simulations else 1
+    simulation_number=max(numbers_simulations)+1 if numbers_simulations else 1
+    #print(simulation_number)
+
+    folder_simulation=os.path.join(folder_parent,"test_"+str(simulation_number))
+    os.makedirs(folder_simulation)
+
+    info_current_file_store={
+        'monitor_thread_launched_pid': False, 
+        'monitor_thread_launched_folder': False, 
+        'process_pid': 64632, 
+        'filename': 'data/test_mdine_loic/crohns-numeric-tsv.tsv', 
+        'session_folder': folder_simulation, 
+        'nb_rows': 100, 
+        'nb_columns': 11, 
+        'covar_start': 2, 
+        'covar_end': 5, 
+        'taxa_start': 6, 
+        'taxa_end': 11, 
+        'reference_taxa': 'otu.counts.ref', 
+        'phenotype_column': 'covars.disease',
+        #'phenotype_column': None, 
+        'first_group': 36, 
+        'second_group': 64, 
+        'filter_zeros': None, 
+        'filter_dev_mean': None, 
+        'parameters_model': 
+        {'beta_matrix': 
+            {'apriori': 'Ridge', 
+            'parameters': 
+            {'alpha': 2, 'beta': 1}
+            }, 
+        'precision_matrix': 
+            {'apriori': 'Lasso', 
+             'parameters': 
+            {'lambda_init': lambda_init}
+            },
+        'nb_tune': 2000,
+        'nb_draws': 1000}}
+
+    if info_current_file_store["phenotype_column"]==None:
+        #Only one group
+        print("Start Inference")  
+        df_covariates=get_df_covariates(info_current_file_store,"reduced")
+        df_taxa=get_df_taxa(info_current_file_store,"df_taxa")
+        run_model(df_covariates,df_taxa,info_current_file_store["parameters_model"],info_current_file_store["session_folder"])
+
+    elif info_current_file_store["phenotype_column"]!=None:
+
+        [df_covariates_1,df_taxa_1],[df_covariates_2,df_taxa_2]=get_separate_data(info_current_file_store)
+        path_first_group=os.path.join(info_current_file_store["session_folder"],"first_group/")
+        path_second_group=os.path.join(info_current_file_store["session_folder"],"second_group/")
+
+        print("Start first inference")
+        run_model(df_covariates_1,df_taxa_1,info_current_file_store["parameters_model"],path_first_group)
+
+        print("Start second inference")
+        run_model(df_covariates_2,df_taxa_2,info_current_file_store["parameters_model"],path_second_group)
+
+def show_precision_matrix():
+    folder="data/test_mdine_loic/"
+    simu_num=[2,3,4,5]
+    lambda_list=[0.01,1,10,100]
+    for i in range(len(simu_num)):
+        num=simu_num[i]
+        idata_first=os.path.join(folder,"test_"+str(num),"first_group/idata.nc")
+        idata_second=os.path.join(folder,"test_"+str(num),"second_group/idata.nc")
+        idata1=az.from_netcdf(idata_first)
+        idata2=az.from_netcdf(idata_second)
+        precision1=idata1.posterior["precision_matrix"].mean(dim=["chain", "draw"]).values
+        precision2=idata2.posterior["precision_matrix"].mean(dim=["chain", "draw"]).values
+
+        np.set_printoptions(suppress=True, precision=4)
+
+        print("Lambda: ",lambda_list[i])
+        print("Precision Matrix First Group: \n",np.round(precision1,3))
+        print("Precision Matrix Second Group: \n",np.round(precision2,3))
+        print("\n")
+        print("-----------------------------------")
+        print("\n")
 
 
 if __name__=="__main__":

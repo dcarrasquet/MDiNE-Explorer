@@ -505,8 +505,6 @@ def check_intervals(interval_cov,interval_taxa,check_ref_taxa,check_separate_dat
         output_cov=html.H5("ERROR Covariates or Taxa field is empty or incorrect",style={'color': 'red'})
         info_taxa=html.H5(f"Taxa: ERROR Covariates or Taxa field is empty or incorrect",style={"margin-left": '30px','color': 'red'})
         output_taxa=html.H5("ERROR Covariates or Taxa field is empty or incorrect",style={'color': 'red'})
-
-    print('Values check:',values_check)
     
     return info_current_file_store,output_cov,info_cov,output_taxa,info_taxa,options_check_boxes,options_check_boxes,options_check_boxes,options_check_boxes,values_check[0],values_check[1],values_check[2],values_check[3]
         
@@ -596,13 +594,6 @@ def on_data(ts_cov,ts_taxa,ts_status_model,data_cov,data_taxa,check_ref_taxa,che
         #print("Premiere option")
         return info_current_file_store,html.Div(),html.Div(),html.Div(),html.Div(),options_check_boxes,options_check_boxes,options_check_boxes,options_check_boxes,[],[],[],[],False,False,False,False
     else:
-        #print("Deuxieme option")
-        print("COUCOUCOUCOCUCO")
-        # print("Liste des checks: \n")
-        # print(check_ref_taxa)
-        # print(check_separate_data)
-        # print(check_filter_zeros)
-        # print(check_filter_dev_mean)
         response=check_intervals(data_cov["value"],data_taxa["value"],check_ref_taxa,check_separate_data,check_filter_zeros,check_filter_dev_mean,info_current_file_store)
         #print(response)
         return *response,False,False,False,False

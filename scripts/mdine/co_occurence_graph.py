@@ -166,9 +166,9 @@ def get_legend_element(legend_store,x_origin,y_origin):
 
 def get_stylesheet_co_occurrence_network(idata,df_taxa,legend_store,hdi,node_size,edge_width,font_size):
 
-    print("On m'appelle souvent stylesheet")
+    #print("On m'appelle souvent stylesheet")
 
-    count_edges=0
+    #count_edges=0
 
     #print("Credibility: ",hdi)
     
@@ -176,9 +176,12 @@ def get_stylesheet_co_occurrence_network(idata,df_taxa,legend_store,hdi,node_siz
     hdi_precision_matrix = az.hdi(idata, var_names=["precision_matrix"], hdi_prob=hdi).precision_matrix
 
     precision_matrix=idata.posterior.precision_matrix.mean(dim=["chain", "draw"])
-    #print(precision_matrix)
+    print("Precision Matrix: \n",precision_matrix)
     counts_mean=df_taxa.mean(axis=0).tolist()[:-1]
     taxa_list= df_taxa.columns.tolist()[:-1]
+
+    # print(len(precision_matrix))
+    # print(len(counts_mean))
 
     #print(precision_matrix)
 
@@ -221,7 +224,6 @@ def get_stylesheet_co_occurrence_network(idata,df_taxa,legend_store,hdi,node_siz
 
             if round(float(lower_hdi),3)*round(float(higher_hdi),3)>=0:
 
-                count_edges+=1
             
                 #Same sign, do not contains null value. Create edge
                 coefficient = correlation_matrix[i, j]
@@ -257,7 +259,6 @@ def get_stylesheet_co_occurrence_network(idata,df_taxa,legend_store,hdi,node_siz
     for el in style_elements_legend:
         stylesheet.append(el)
 
-    print("Compte total edges: ",count_edges)
     
     return stylesheet
 
@@ -355,8 +356,6 @@ def get_informations_diff_network(idata1,df_taxa1,idata2,df_taxa2,hdi):
         "degree_distribution": dict(Counter(degree)),
         "assortativity_color": assortativity_color
     }
-
-    print(result)
     
     return result
 
@@ -365,7 +364,6 @@ def get_informations_diff_network(idata1,df_taxa1,idata2,df_taxa2,hdi):
 
 def get_stylesheet_diff_network(idata1,df_taxa1,idata2,df_taxa2,legend_store,hdi,node_size,edge_width,font_size):
 
-    count_edges=0
 
     hdi_precision_matrix1 = az.hdi(idata1, var_names=["precision_matrix"], hdi_prob=hdi).precision_matrix
     hdi_precision_matrix2 = az.hdi(idata2, var_names=["precision_matrix"], hdi_prob=hdi).precision_matrix
@@ -431,7 +429,7 @@ def get_stylesheet_diff_network(idata1,df_taxa1,idata2,df_taxa2,legend_store,hdi
                     }
                 }
             else:
-                count_edges+=1
+    
                 if abs(correlation_matrix2[i,j])>=abs(correlation_matrix1[i,j]):
                     #Abs Higher for the second group
                     style_edge={
@@ -462,7 +460,6 @@ def get_stylesheet_diff_network(idata1,df_taxa1,idata2,df_taxa2,legend_store,hdi
     for el in style_elements_legend:
         stylesheet.append(el)
 
-    print("Count edges diff network: ",count_edges)
     
     return stylesheet
 

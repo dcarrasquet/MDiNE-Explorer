@@ -113,9 +113,12 @@ initial_info_current_file={
         'precision_matrix':{
             'apriori':'Lasso',
             'parameters':{
-                'lambda_init':999
+                'lambda_init':10
             }
-        }
+        },
+        "nb_draws":1000,
+        "nb_tune":2000,
+        "target_accept":0.9,
     }
 }
 

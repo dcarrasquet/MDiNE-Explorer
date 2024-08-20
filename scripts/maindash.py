@@ -18,28 +18,33 @@ direct_simu=False
 direct_info_current_file_store={'monitor_thread_launched_pid': False, 
                                 'monitor_thread_launched_folder': False, 
                                 'process_pid': 64632, 
-                                'filename': 'data/dash_app/session_0/table_phylum.tsv', 
-                                'session_folder': 'data/dash_app/session_0/', 
-                                'nb_rows': 118, 
-                                'nb_columns': 170, 
+                                'filename': 'data/dash_app/session_00/merged_table_final.tsv', 
+                                'session_folder': 'data/dash_app/session_00/', 
+                                'nb_rows': 44, 
+                                'nb_columns': 331, 
                                 'covar_start': 1, 
-                                'covar_end': 6, 
-                                'taxa_start': 7, 
-                                'taxa_end': 170, 
-                                'reference_taxa': 'Firmicutes_A', 
+                                'covar_end': 10, 
+                                'taxa_start': 11, 
+                                'taxa_end': 331, 
+                                'reference_taxa': 'd__Bacteria;p__Bacteroidota;c__Bacteroidia;o__Bacteroidales;f__Bacteroidaceae;g__Phocaeicola', 
                                 'phenotype_column': 'Study.Group', 
                                 'first_group': 34, 
-                                'second_group': 84, 
-                                'filter_zeros': 90, 
-                                'filter_dev_mean': 70, 
-                                'parameters_model': 
-                                {'beta_matrix': 
-                                 {'apriori': 'Normal', 
-                                  'parameters': 
-                                  {'alpha': 1, 'beta': 1}}, 
-                                  'precision_matrix': 
-                                  {'apriori': 'Lasso', 'parameters': 
-                                   {'lambda_init': 0.1}}}}
+                                'second_group': 21, 
+                                'filter_zeros': 23, 
+                                'filter_dev_mean': 40, 
+                                'status-run-model': 'not-yet', 
+                                'parameters_model': {
+                                    'beta_matrix': {
+                                        'apriori': 'Horseshoe',
+                                        'parameters': {} 
+                                    },
+                                    'precision_matrix': 
+                                    {'apriori': 'Lasso',
+                                    'parameters': {'lambda_init': 20}
+                                    },
+                                    'nb_draws':1000,
+                                    'nb_tune':2000,
+                                    'target_accept':0.9}}
 
 
 

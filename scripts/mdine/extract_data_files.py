@@ -84,10 +84,14 @@ def get_df_covariates(info_current_file,type):
     start_cov=info_current_file["covar_start"]
     end_cov=info_current_file["covar_end"]
     if type=="all" or info_current_file["phenotype_column"]==None or info_current_file["phenotype_column"]=="error":
-        return get_df_file(info_current_file).iloc[:,start_cov-1:end_cov]
+        df_before_normalization=get_df_file(info_current_file).iloc[:,start_cov-1:end_cov]
+        df_normalized= (df_before_normalization - df_before_normalization.min()) / (df_before_normalization.max() - df_before_normalization.min())
+        return df_normalized
     else:
         df_all_covariates=get_df_file(info_current_file).iloc[:,start_cov-1:end_cov]
-        return df_all_covariates.drop(columns=[info_current_file["phenotype_column"]])
+        df=df_all_covariates.drop(columns=[info_current_file["phenotype_column"]])
+        df_normalized= (df - df.min()) / (df.max() - df.min())
+        return df_normalized
 
 def get_infos_file(filename):
     file_extention=filename.split(".")[-1]
