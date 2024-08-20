@@ -9,7 +9,7 @@ external_stylesheets = ['https://cdnjs.cloudflare.com/ajax/libs/bulma/0.9.3/css/
 #dash._dash_renderer._set_react_version('18.2.0')
 app = dash.Dash(__name__,suppress_callback_exceptions=True,external_stylesheets=external_stylesheets)#,external_stylesheets=external_stylesheets
 
-app.title = "iMDiNE"
+app.title = "MDiNE Explorer"
 #type_storage="memory"
 type_storage="session"
 
