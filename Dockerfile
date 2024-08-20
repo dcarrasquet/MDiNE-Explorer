@@ -7,7 +7,7 @@ RUN apt-get update && apt-get install -y git
 RUN conda create -n dash_app python=3.9 -y
 SHELL ["conda", "run", "-n", "dash_app", "/bin/bash", "-c"]
 
-RUN git clone https://github.com/dcarrasquet/iMDiNE.git /app
+RUN git clone https://github.com/dcarrasquet/MDiNE-Explorer.git /app
 # RUN ls -l /app
 # Copier le fichier des dépendances (environment.yml)
 
