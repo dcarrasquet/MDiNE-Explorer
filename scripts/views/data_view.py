@@ -314,7 +314,6 @@ def get_new_session_folder():
                 State("info-current-file-store","data"),prevent_initial_call=True)
 def on_click(filename,contents, info_current_file_store):#data,
 
-    print('ICICICICIICI')
     if filename is None:
         # prevent the None callbacks is important with the store component.
         # you don't want to update the store for nothing.
@@ -418,7 +417,7 @@ def is_numeric(value):
         pd.to_numeric(value)
         return True
     except ValueError:
-        #print("Error value: ",value)
+        print("Error value: ",value)
         return False
 
 def create_dash_table(df):
@@ -963,7 +962,6 @@ def get_changes_filters(check_dev_mean,check_zeros,ts_dev_mean,ts_zeros,data_dev
         State('info-current-file-store','data'),prevent_initial_call=True
 )
 def clear_all_data(n_clicks,info_current_file_store):
-    #print("COucou ej suis appelé")
     if n_clicks is None or n_clicks==0:
         raise PreventUpdate
     
@@ -983,7 +981,8 @@ def clear_all_data(n_clicks,info_current_file_store):
                         os.rmdir(entry.path)
                         #print(f"Directory: {entry.name}")
     except FileNotFoundError:
-        print(f"The directory {session_folder} does not exist.")
+        pass
+        #print(f"The directory {session_folder} does not exist.")
     except PermissionError:
         print(f"Permission denied for accessing the directory {session_folder}.")
 
@@ -994,11 +993,13 @@ def clear_all_data(n_clicks,info_current_file_store):
         try:
             process = psutil.Process(pid_to_kill)
             process.terminate()  # Kill process
-            print(f"Processus avec PID {pid_to_kill} terminé avec succès.")
+            #print(f"Processus avec PID {pid_to_kill} terminé avec succès.")
         except psutil.NoSuchProcess:
-            print(f"Processus avec PID {pid_to_kill} n'existe pas.")
+            pass
+            #print(f"Processus avec PID {pid_to_kill} n'existe pas.")
         except psutil.AccessDenied:
-            print(f"Accès refusé pour terminer le processus avec PID {pid_to_kill}.")
+            pass
+            #print(f"Accès refusé pour terminer le processus avec PID {pid_to_kill}.")
 
     # Reset everything to default values
     default_info_current_file={
@@ -1021,20 +1022,19 @@ def clear_all_data(n_clicks,info_current_file_store):
         'filter_dev_mean':None,
         #'status-run-model':'not-yet',
         'parameters_model':{
-            'beta_matrix':{
-                'apriori':'Normal',
-                'parameters':{
-                    'alpha':1,
-                    'beta':1
-                }
-            },
-            'precision_matrix':{
-                'apriori':'Lasso',
-                'parameters':{
-                    'lambda_init':1
-                }
+        'beta_matrix':{
+            'apriori':'Horseshoe',
+        },
+        'precision_matrix':{
+            'apriori':'Lasso',
+            'parameters':{
+                'lambda_init':10
             }
-        }
+        },
+        "nb_draws":1000,
+        "nb_tune":2000,
+        "target_accept":0.9,
+    }
     }
 
     #  Block/Unblock what you need

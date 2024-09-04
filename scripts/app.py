@@ -129,7 +129,7 @@ def make_layout():
         try:
             # Créer le dossier et ses parents si nécessaire
             os.makedirs(path_data)
-            print(f"Le dossier '{path_data}' a été créé avec succès.")
+            #print(f"Le dossier '{path_data}' a été créé avec succès.")
         except OSError as e:
             print(f"Erreur : Impossible de créer le dossier '{path_data}' : {e.strerror}")
 
@@ -256,27 +256,30 @@ def monitor_disconnection(session_folder,pid_to_kill,type_action):
         except FileNotFoundError:
             last_time=0
         if time.time() - last_time > 10:
-            print(f"L'utilisateur a probablement fermé la page {txt_file}")
+            #print(f"L'utilisateur a probablement fermé la page {txt_file}")
 
             if type_action=="kill_process":
-                print("Je veux du kill")
+                #print("Je veux du kill")
                 try:
                     process = psutil.Process(pid_to_kill)
                     process.terminate()  # Terminer le processus
-                    print(f"Processus avec PID {pid_to_kill} terminé avec succès.")
+                    #print(f"Processus avec PID {pid_to_kill} terminé avec succès.")
                 except psutil.NoSuchProcess:
-                    print(f"Processus avec PID {pid_to_kill} n'existe pas.")
+                    pass
+                    #print(f"Processus avec PID {pid_to_kill} n'existe pas.")
                 except psutil.AccessDenied:
-                    print(f"Accès refusé pour terminer le processus avec PID {pid_to_kill}.")
+                    pass
+                    #print(f"Accès refusé pour terminer le processus avec PID {pid_to_kill}.")
 
             # Delete user folder
             elif type_action=="delete_folder":
                 try:
                     # Suppression du dossier et de son contenu récursivement
                     shutil.rmtree(session_folder)
-                    print(f"Le dossier '{session_folder}' a été supprimé avec succès.")
+                    #print(f"Le dossier '{session_folder}' a été supprimé avec succès.")
                 except OSError as e:
-                    print(f"Erreur : {session_folder} : {e.strerror}")
+                    pass
+                    #print(f"Erreur : {session_folder} : {e.strerror}")
             else:
                 raise ValueError
 
@@ -299,23 +302,26 @@ def close_session():
                 last_time=float(timestamps[-1].strip())
                 if time.time()-last_time>=20:
                     #Delete and stop everything related to the user session
-                    print(f"L'utilisateur a probablement fermé la page {txt_file}")
+                    #print(f"L'utilisateur a probablement fermé la page {txt_file}")
                     if pid_to_kill!=None:
                         try:
                             process = psutil.Process(pid_to_kill)
                             process.terminate()  # Terminer le processus
-                            print(f"Processus avec PID {pid_to_kill} terminé avec succès.")
+                            #print(f"Processus avec PID {pid_to_kill} terminé avec succès.")
                         except psutil.NoSuchProcess:
-                            print(f"Processus avec PID {pid_to_kill} n'existe pas.")
+                            pass
+                            #print(f"Processus avec PID {pid_to_kill} n'existe pas.")
                         except psutil.AccessDenied:
-                            print(f"Accès refusé pour terminer le processus avec PID {pid_to_kill}.")
+                            pass
+                            #print(f"Accès refusé pour terminer le processus avec PID {pid_to_kill}.")
 
                     try:
                         # Suppression du dossier et de son contenu récursivement
                         shutil.rmtree(session_folder)
-                        print(f"Le dossier '{session_folder}' a été supprimé avec succès.")
+                        #print(f"Le dossier '{session_folder}' a été supprimé avec succès.")
                     except OSError as e:
-                        print(f"Erreur : {session_folder} : {e.strerror}")
+                        pass
+                        #print(f"Erreur : {session_folder} : {e.strerror}")
     
     return flask.jsonify({"status": "success"}), 200
 

@@ -1,33 +1,44 @@
-FROM continuumio/miniconda3
+FROM continuumio/miniconda3:latest
 
-# Install git
-RUN apt-get update && apt-get install -y git
+LABEL name="pymc"
+LABEL description="Environment for PyMC version 4"
 
-# Créer et activer un nouvel environnement conda
-RUN conda create -n dash_app python=3.9 -y
-SHELL ["conda", "run", "-n", "dash_app", "/bin/bash", "-c"]
+ENV ENV_NAME=dash-app
+ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
 
-RUN git clone https://github.com/dcarrasquet/MDiNE-Explorer.git /app
-# RUN ls -l /app
-# Copier le fichier des dépendances (environment.yml)
+# Switch to non-root user if necessary (optional depending on base image)
+# USER $NB_UID
 
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    g++ \
+    make \
+    libc-dev \
+    python3-dev \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN mkdir -p /app
 COPY environment.yml /tmp/environment.yml
+COPY scripts /app/scripts
 
-# RUN mkdir -p /app
-# COPY results /app/results
-# COPY scripts /app/scripts
+# Create environment and install PyMC
+RUN conda env create -f /tmp/environment.yml && \
+    conda run -n dash-app conda install -c conda-forge -y pymc && \
+    conda clean --all -f -y
 
-# Installer les dépendances
-RUN conda env update -n dash_app -f /tmp/environment.yml
+# Fix PkgResourcesDeprecationWarning
+#RUN conda run -n dash-app pip install --upgrade setuptools==58.3.0
 
-# Activer l'environnement conda
-RUN echo "conda activate dash_app" >> ~/.bashrc
-SHELL ["conda", "run", "-n", "dash_app", "/bin/bash", "-c"]
+# Add conda environment to the PATH
+#ENV PATH=/opt/conda/envs/dash-app/bin:$PATH
 
-# Exposer le port sur lequel Dash va tourner
-EXPOSE 8080
-
+# Setup working folder
 WORKDIR /app
 
-# Commande pour lancer l'application
-CMD ["conda", "run", "--no-capture-output", "-n", "dash_app", "python", "scripts/app.py"]
+# For running from jupyter notebook
+EXPOSE 8080
+
+# Run the application
+CMD ["conda", "run", "--no-capture-output", "-n", "dash-app", "python", "scripts/app.py"]

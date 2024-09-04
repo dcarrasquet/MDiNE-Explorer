@@ -1,24 +1,24 @@
-document.body.onbeforeunload = function(event) {
-    console.log("This message is printed in the browser console");
-    try {
-        let sessionData = sessionStorage.getItem('info-current-file-store');
-        console.log("COucou toi");
-        console.log(sessionData);
-    } catch (error) {
-        // Code à exécuter en cas d'erreur
-        console.error("Une erreur s'est produite :", error);
-    }
+// document.body.onbeforeunload = function(event) {
+//     console.log("This message is printed in the browser console");
+//     try {
+//         let sessionData = sessionStorage.getItem('info-current-file-store');
+//         console.log("COucou toi");
+//         console.log(sessionData);
+//     } catch (error) {
+//         // Code à exécuter en cas d'erreur
+//         console.error("Une erreur s'est produite :", error);
+//     }
     
-    let sessionData = sessionStorage.getItem('info-current-file-store');
-    fetch('/close-session', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: sessionData
-        //body: sessionData
-    }).then(response => response.json())
-      .then(data => console.log(data))
-      .catch((error) => console.error('Error:', error));
-    return "Something"
-};
+//     let sessionData = sessionStorage.getItem('info-current-file-store');
+//     fetch('/close-session', {
+//         method: 'POST',
+//         headers: {
+//             'Content-Type': 'application/json'
+//         },
+//         body: sessionData
+//         //body: sessionData
+//     }).then(response => response.json())
+//       .then(data => console.log(data))
+//       .catch((error) => console.error('Error:', error));
+//     return "Something"
+// };

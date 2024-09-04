@@ -1,0 +1,49 @@
+FROM continuumio/miniconda3
+
+# Install git
+# RUN apt-get update && apt-get install -y git
+# RUN apt install --no-install-recommends -y  g++ make
+
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    make \
+    gcc \
+    pkg-config \
+    #theano \
+    #libblas-dev \
+    build-essential \
+    g++ \
+    libopenblas-dev \
+    liblapack-dev \
+    libhdf5-dev \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+# Créer et activer un nouvel environnement conda
+RUN conda create -n dash_app python=3.12.2 pymc==5.13.0 -c conda-forge -y
+#RUN conda create -n dash_app -y
+
+#--no-install-recommends
+
+SHELL ["conda", "run", "-n", "dash_app", "/bin/bash", "-c"]
+
+
+RUN mkdir -p /app
+COPY environment.yml /tmp/environment.yml
+COPY scripts /app/scripts
+
+
+# Installer les dépendances
+RUN conda env update -n dash_app -f /tmp/environment.yml
+
+# Activer l'environnement conda
+RUN echo "conda activate dash_app" >> ~/.bashrc
+SHELL ["conda", "run", "-n", "dash_app", "/bin/bash", "-c"]
+
+# Exposer le port sur lequel Dash va tourner
+EXPOSE 8080
+
+WORKDIR /app
+
+# Commande pour lancer l'application
+CMD ["conda", "run", "--no-capture-output", "-n", "dash_app", "python", "scripts/app.py"]

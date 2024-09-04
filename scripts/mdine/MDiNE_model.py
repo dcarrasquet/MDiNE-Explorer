@@ -109,7 +109,6 @@ def run_model(covariate_matrix_data,counts_matrix_data,simulation,folder):
         if precision_matrix_choice=="Lasso":
 
             lambda_init=parameters_precision_matrix["lambda_init"]
-            print('Lambda init: ',lambda_init)
             lambda_mdine=pm.Exponential("lambda_mdine",1/lambda_init) 
 
             

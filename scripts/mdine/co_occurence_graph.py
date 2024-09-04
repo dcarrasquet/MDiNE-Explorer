@@ -5,6 +5,7 @@ from math import cos,sin,sqrt,pi
 from collections import Counter, defaultdict
 import networkx as nx
 import os
+import json
 
 def analyse_gml_co_occurence_network(filename_gml):
     G = nx.read_gml(filename_gml)
@@ -39,8 +40,35 @@ def get_gml_co_occurence_network(idata,df_taxa,legend_store,hdi,filename_gml):
                 coefficient = correlation_matrix[i, j]
                 color_edge = '#18B532' if coefficient > 0 else '#E22020'
                 G.add_edge(taxa_list[i], taxa_list[j], color=color_edge, type='solid',width=abs(coefficient))
-    
+
     nx.write_gml(G, filename_gml)
+    
+    # graph_matrix=np.zeros((j_taxa,j_taxa))
+
+    # for i in range (j_taxa):
+    #     for j in range(i+1):
+    #         #Update Edges properties
+    #         lower_hdi=hdi_precision_matrix[i][j][0]
+    #         higher_hdi=hdi_precision_matrix[i][j][1]
+    #         if round(float(lower_hdi),3)*round(float(higher_hdi),3)>=0:
+            
+    #             #Same sign, do not contains null value. Create edge
+    #             graph_matrix[i][j] = precision_matrix[i, j]
+    #             graph_matrix[j][i] = precision_matrix[i, j]
+                
+    
+    
+
+    # base_directory = os.path.dirname(filename_gml)
+
+    # dict_json_matrix={}
+    # dict_json_matrix["list_taxa_long"]=taxa_list
+    # dict_json_matrix["list_taxa"]=extract_species_and_phylum(taxa_list)
+    # dict_json_matrix["list_mean_counts"]=counts_mean
+    # dict_json_matrix["matrix"]=graph_matrix.tolist()
+
+    # with open(os.path.join(base_directory,"co_occurence_network.json"), "w") as fichier_json:
+    #     json.dump(dict_json_matrix, fichier_json, indent=4)
 
 def get_gml_diff_network(idata1,df_taxa1,idata2,df_taxa2,hdi,filename_gml):
     G = nx.Graph()
@@ -92,18 +120,57 @@ def get_gml_diff_network(idata1,df_taxa1,idata2,df_taxa2,hdi,filename_gml):
                     G.add_edge(taxa_list[i], taxa_list[j], type='solid')
     
     nx.write_gml(G, filename_gml)
+
+    # graph_matrix=np.zeros((j_taxa,j_taxa))
+    # list_color_nodes=[]
+
+    # for i in range (j_taxa):
+    #     if counts_mean2[i]>=counts_mean1[i]:
+    #         list_color_nodes.append(2)
+    #     else:
+    #         list_color_nodes.append(1)
+    #     for j in range(i):
+    #         #Update Edges properties
+    #         lower_hdi1=hdi_precision_matrix1[i][j][0]
+    #         higher_hdi1=hdi_precision_matrix1[i][j][1]
+    #         lower_hdi2=hdi_precision_matrix2[i][j][0]
+    #         higher_hdi2=hdi_precision_matrix2[i][j][1]
+    #         if min(higher_hdi1,higher_hdi2)<max(lower_hdi1,lower_hdi2):
+    #             #Intervals overlap, so significant difference
+    #             if abs(correlation_matrix2[i,j])>=abs(correlation_matrix1[i,j]):
+    #                 graph_matrix[i][j]=2
+    #                 graph_matrix[j][i]=2
+    #             else:
+    #                 graph_matrix[i][j]=1
+    #                 graph_matrix[j][i]=1
+                    
+                
+    
+    
+
+    # base_directory = os.path.dirname(filename_gml)
+
+    # dict_json_matrix={}
+    # dict_json_matrix["list_taxa_long"]=taxa_list
+    # dict_json_matrix["list_taxa"]=extract_species_and_phylum(taxa_list)
+    # dict_json_matrix["nodes_higher_in_which_group"]=list_color_nodes
+    # dict_json_matrix["matrix_higher_in_which_group"]=graph_matrix.tolist()
+
+    # with open(os.path.join(base_directory,"diff_network.json"), "w") as fichier_json:
+    #     json.dump(dict_json_matrix, fichier_json, indent=4)
             
 
 def get_elements_co_occurence_network(df_taxa,legend_store):
     #print("On m'appelle souvent elements")
     elements=[]
     taxa_list= df_taxa.columns.tolist()[:-1]
+    #taxa_list=extract_species_and_phylum(taxa_list)
     nb_species=len(taxa_list)
 
     ## Construction of the circular layout
     x_circle=0
     y_circle=0
-    radius=300
+    radius=1000
 
 
     for i in range (nb_species):
@@ -176,9 +243,10 @@ def get_stylesheet_co_occurrence_network(idata,df_taxa,legend_store,hdi,node_siz
     hdi_precision_matrix = az.hdi(idata, var_names=["precision_matrix"], hdi_prob=hdi).precision_matrix
 
     precision_matrix=idata.posterior.precision_matrix.mean(dim=["chain", "draw"])
-    print("Precision Matrix: \n",precision_matrix)
     counts_mean=df_taxa.mean(axis=0).tolist()[:-1]
     taxa_list= df_taxa.columns.tolist()[:-1]
+
+    #taxa_list=extract_species_and_phylum(taxa_list_long)
 
     # print(len(precision_matrix))
     # print(len(counts_mean))
@@ -372,6 +440,7 @@ def get_stylesheet_diff_network(idata1,df_taxa1,idata2,df_taxa2,legend_store,hdi
     precision_matrix2=idata2.posterior.precision_matrix.mean(dim=["chain", "draw"])
 
     taxa_list= df_taxa1.columns.tolist()[:-1]
+    #taxa_list=extract_species_and_phylum(taxa_list)
 
     counts_mean1=df_taxa1.mean(axis=0).tolist()[:-1]
     counts_mean2=df_taxa2.mean(axis=0).tolist()[:-1]
@@ -668,3 +737,20 @@ def get_dict_element_color(legend_store):
 
     return dict_elements_group
 
+def extract_species_and_phylum(liste_microbes):
+    especes = []
+    for microbe in liste_microbes:
+        # Séparation des différents niveaux taxonomiques
+        niveaux = microbe.split(';')
+        
+        # Extraction du phylum (p__) et de l'espèce (s__)
+        phylum = next(niveau for niveau in niveaux if niveau.startswith('p__')).split('__')[1]
+        espece = next(niveau for niveau in niveaux if niveau.startswith('s__')).split('__')[1]
+        
+        # Ajout de l'espèce à la liste des espèces
+        especes.append(espece)
+        
+        # Impression du phylum associé
+        print(f"Phylum: {phylum} -> Espèce: {espece}")
+    
+    return especes

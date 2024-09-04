@@ -38,10 +38,27 @@ def layout_export_results(status_run_model):
 
 def make_real_layout():
     return html.Div([
+            html.H5("The inference has been completed. You can download the raw results below.",style={"margin-top":"20px","margin-bottom":"20px"}),
             html.Div([
                 html.Button("Download raw results", id="download-button",style=button_style),
                 dcc.Download(id="download")
-            ])
+            ]),
+
+            html.P('''A .zip file 
+                   is downloaded containing one or two inference files 
+                   (depending on whether the data has been split into two groups). 
+                   The data is in .nc format. They can be opened in several
+                   different software programs or programming languages. 
+                   In Python, in particular, the arviz library makes it easy to 
+                   open this file with the command:''',style={"margin-top":"20px"}),
+
+            html.Pre("import arviz as az\nidata = az.from_netcdf('idata.nc')\nprint(idata)",style={"margin-top":"10px"}),
+            html.P('''With this data, you can redo all the figures shown in the visualization 
+                   section. In particular, downloading inference data can be useful if you wish 
+                   to observe other performance metrics.''',style={"margin-top":"20px"})
+
+
+
 
         ])
 

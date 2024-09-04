@@ -229,8 +229,8 @@ def layout_model():
                     to the part related to the covariables and the precision matrix for estimating the 
                     associations between species across a binary group. However, all models require the 
                     user to specify certain hyperparameters to ensure that methods give accurate results. 
-                    Briefly, 3 models are available when evaluating the effect of covariables on taxa, 
-                    the LASSO, the Ridge and the Horseshoe.''',style={"margin-top":"1em"}),
+                    Briefly, 4 models are available when evaluating the effect of covariables on taxa, 
+                    the LASSO, the Ridge, the Horseshoe and the LN-CASS.''',style={"margin-top":"1em"}),
                     html.P('''Below, we are providing guidance about the choice of values of hyperparameters 
                     depending on the type of model chosen by the user.''',style={"margin-top":"1em"})
                 ]),
@@ -664,7 +664,10 @@ def on_data(ts,n_intervals,data,info_current_file_store,model_output_children,st
         children=[]
 
         if len(all_output)!=0 and "model.debug()" in all_output[-1].get("text","Error"):
-            children.append(html.H5("The model initialization did not work. Please check that you have at least three taxas remaining and consider revising the hyperparameterisation, in particular the choice of lambda_init for the precision matrix."))
+            children.append(dcc.Markdown('''The model initialization did not work. Please check that you have 
+                                         at least three taxas remaining and consider revising the hyperparameterisation, 
+                                         in particular the choice of $\\lambda_{init}$ for the precision matrix.''',mathjax=True))
+            children.append(dcc.Markdown('''Also check that you have count data with whole numbers and not proportions.''',mathjax=True))
         else:
             for data in all_output:
 

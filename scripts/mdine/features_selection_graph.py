@@ -494,3 +494,22 @@ def get_dict_element_color(legend_store):
                 dict_elements_group[element]=group["color"]
 
     return dict_elements_group
+
+
+def extract_species_and_phylum(liste_microbes):
+    especes = []
+    for microbe in liste_microbes:
+        # Séparation des différents niveaux taxonomiques
+        niveaux = microbe.split(';')
+        
+        # Extraction du phylum (p__) et de l'espèce (s__)
+        phylum = next(niveau for niveau in niveaux if niveau.startswith('p__')).split('__')[1]
+        espece = next(niveau for niveau in niveaux if niveau.startswith('s__')).split('__')[1]
+        
+        # Ajout de l'espèce à la liste des espèces
+        especes.append(espece)
+        
+        # Impression du phylum associé
+        print(f"Phylum: {phylum} -> Espèce: {espece}")
+    
+    return especes

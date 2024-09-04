@@ -1,0 +1,17 @@
+name: dash_app
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - psutil
+  - blas
+  - h5py
+  - libblas
+  - numpy
+  - pip:
+      - dash==2.16.1
+      - dash_cytoscape==0.3.0
+      - flask==3.0.3 
+      - pandas==2.2.1 
+      - arviz==0.18.0
+      - networkx==3.3

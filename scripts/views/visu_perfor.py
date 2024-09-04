@@ -62,10 +62,10 @@ def output_dropdown(list_graphs,info_current_file_store):
 
     new_children=[]
 
-    print(info_current_file_store)
+    #print(info_current_file_store)
 
     two_groups=info_current_file_store["second_group"]
-    print(two_groups)
+    #print(two_groups)
 
 
     if list_graphs!=None:

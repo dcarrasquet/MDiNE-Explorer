@@ -1,0 +1,35 @@
+FROM mambaorg/micromamba:1.5.9
+
+# Définir les variables d'environnement
+ENV MAMBA_DOCKERFILE_ACTIVATE=1
+ENV ENV_NAME=dash_app
+
+RUN apt-get update && apt-get upgrade -y && apt-get install -y git
+
+# Créer un environnement conda avec mamba et installer Python
+RUN mamba create -n $ENV_NAME -y python=3.12.2 pymc==5.13.0 -c conda-forge && \
+    mamba clean --all -f -y
+
+
+SHELL ["mamba", "run", "-n", "dash_app", "/bin/bash", "-c"]
+
+
+RUN mkdir -p /app
+COPY environment.yml /tmp/environment.yml
+COPY scripts /app/scripts
+
+
+# Installer les dépendances
+RUN conda env update -n dash_app -f /tmp/environment.yml
+
+# Activer l'environnement conda
+RUN echo "mamba activate dash_app" >> ~/.bashrc
+SHELL ["mamba", "run", "-n", "dash_app", "/bin/bash", "-c"]
+
+# Exposer le port sur lequel Dash va tourner
+EXPOSE 8080
+
+WORKDIR /app
+
+# Commande pour lancer l'application
+CMD ["mamba", "run", "--no-capture-output", "-n", "dash_app", "python", "scripts/app.py"]
